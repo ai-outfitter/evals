@@ -1,0 +1,3 @@
+# Mutual review: every path is owned by both fixture agents, so any change
+# authored by one requires a review from the other.
+* @lead @implementer
