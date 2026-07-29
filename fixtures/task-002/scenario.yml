@@ -1,0 +1,64 @@
+# task-002: issue -> PR -> review -> merge full-cycle infrastructure fixture.
+#
+# Two generic agents collaborate over the local forge shim
+# (fixtures/task-002/forge/forge.py) and a protected bare repository prepared
+# by scripts/prepare_cycle_fixture.sh. Like task-001, this is an
+# infrastructure fixture: a pass validates plumbing, not scaffold quality.
+#
+# The hosted matrix workflow does not execute multi-agent cells yet;
+# scripts/run_cycle_reference.py is the deterministic reference driver that
+# scripts/check.sh runs to validate the fixture, evaluator, and forge
+# semantics without model calls. Model-driven runs bind the roles below to
+# the cycle-lead and cycle-implementer profiles.
+
+id: task-002
+kind: full-cycle
+default_branch: main
+branch_protection:
+  required_approvals: 1
+  direct_push_to_default: rejected
+codeowners: mutual  # fixtures/task-002/repo/CODEOWNERS
+
+agents:
+  lead:
+    profile: cycle-lead
+    role: files the issue, reviews, approves
+  implementer:
+    profile: cycle-implementer
+    role: outfitter agent-operator resident agent completing assigned work in a PR
+
+steps:
+  - actor: lead
+    action: >
+      File an issue titled "Add PING file via auto-merged PR" with body:
+      create a file named PING (content: ping) at the repository root via a
+      pull request; set the pull request to auto-merge; respond to review
+      feedback. Assign the issue to implementer.
+  - actor: implementer
+    action: >
+      Wake on assignment. Create a branch, add PING (content: ping), push,
+      open a pull request against main linked to the issue, and enable
+      auto-merge.
+  - actor: lead
+    action: >
+      Review the pull request and submit request-changes with the comment
+      "PONG — rename PING to PONG using git mv so the rename lands in git
+      history".
+  - actor: implementer
+    action: >
+      Rename via `git mv PING PONG`, commit, push, and sync the pull
+      request.
+  - actor: lead
+    action: Verify the rename on the new head and approve.
+  - actor: forge
+    action: Auto-merge lands the pull request once protection is satisfied.
+
+evaluator: fixtures/task-002/evaluator/evaluate.py
+assertions:
+  - issue authored by lead and assigned to implementer
+  - merged pull request authored by implementer against main, linked to the issue
+  - a request-changes review (body mentions PONG) then an approval from lead,
+    with the approval covering the merged head SHA
+  - merged tree contains PONG (content ping) and no PING
+  - git history records the rename (git log --follow -M --diff-filter=R)
+  - merge landed via auto-merge (not manual) as a two-parent merge commit

@@ -4,7 +4,11 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
-python3 -m py_compile scripts/*.py fixtures/task-001/evaluator/evaluate.py tests/*.py
+python3 -m py_compile scripts/*.py \
+  fixtures/task-001/evaluator/evaluate.py \
+  fixtures/task-002/evaluator/evaluate.py \
+  fixtures/task-002/forge/forge.py \
+  tests/*.py
 bash -n scripts/*.sh
 actionlint .github/workflows/*.yml
 python3 -m unittest discover -s tests -v
@@ -64,5 +68,9 @@ python3 scripts/validate_bundle.py \
 python3 scripts/reduce_results.py "$tmp/results" "$tmp/report" >/dev/null
 test -s "$tmp/report/report.md"
 test -s "$tmp/report/results.json"
+
+# task-002 full-cycle fixture: scripted reference run of both roles plus the
+# evaluator, without model calls.
+python3 scripts/run_cycle_reference.py --workdir "$tmp/cycle" >/dev/null
 
 echo "all checks passed"
