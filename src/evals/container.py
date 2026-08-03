@@ -173,7 +173,7 @@ class PodmanAgentRunner:
         parsed = parse_pi_output(stdout)
         if timed_out:
             agent_status = "timeout"
-        elif exit_code == 0 and parsed["chat_history"]:
+        elif exit_code == 0 and parsed["chat_history"] and parsed["stop_reason"] != "error":
             agent_status = "success"
         else:
             agent_status = "error"

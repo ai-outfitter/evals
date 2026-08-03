@@ -27,8 +27,8 @@ providers:
         reasoning: true
         context_window: 32768
         max_tokens: 4096
-      - id: gpt-oss:latest
-        name: GPT-OSS 20B (Ollama)
+      - id: nemotron-3-nano:4b
+        name: Nemotron 3 Nano 4B (Ollama)
         reasoning: true
         context_window: 65536
         max_tokens: 8192

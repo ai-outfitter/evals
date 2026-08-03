@@ -38,7 +38,11 @@ def sha256_file(path: Path) -> str:
 def bundle_files(cell_dir: Path) -> list[Path]:
     manifest = cell_dir / "manifest.sha256"
     if not manifest.is_file():
-        raise BundleError(f"cell has no manifest.sha256: {cell_dir}")
+        # A run interrupted between result.json and manifest leaves a
+        # manifest-less cell; the manifest is derived state, so regenerate it.
+        from .collect import write_manifest
+
+        write_manifest(cell_dir)
     files = [manifest]
     for line in manifest.read_text(encoding="utf-8").splitlines():
         _checksum, separator, name = line.partition("  ")

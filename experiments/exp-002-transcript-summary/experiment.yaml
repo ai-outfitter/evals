@@ -12,7 +12,7 @@ container:
 providers: ../../models.yaml
 
 matrix:
-  model: ["ollama/qwen3:32b", "ollama/qwen3:4b", "ollama/gpt-oss:latest"]
+  model: ["ollama/qwen3:32b", "ollama/qwen3:4b", "ollama/nemotron-3-nano:4b"]
   thinking: [off, high]
   agent: [summarizer]
   repetitions: 1
@@ -23,12 +23,12 @@ limits:
   cell_timeout_seconds: 900
 
 judges:
-  - id: judge-qwen32
-    model: "ollama/qwen3:32b"
+  - id: judge-qwen4b
+    model: "ollama/qwen3:4b"
     thinking: off
     rubric: ../../judges/summary-rubric.yaml
-  - id: judge-gpt-oss
-    model: "ollama/gpt-oss:latest"
+  - id: judge-nemotron
+    model: "ollama/nemotron-3-nano:4b"
     thinking: off
     rubric: ../../judges/summary-rubric.yaml
 
