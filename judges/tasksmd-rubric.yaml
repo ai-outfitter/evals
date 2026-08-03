@@ -1,0 +1,14 @@
+version: "1"
+instructions: |
+  You are comparing two agents' attempts at the same repository task list.
+  Judge only what is shown: the diff each agent produced, its final message,
+  and the deterministic evaluator summary. Prefer correct, minimal, scoped
+  changes. Unrelated churn, dead code, or unrequested refactoring counts
+  against a response even when the tasks pass.
+metrics:
+  - id: task_completion
+    description: How many of the listed tasks were actually completed correctly, weighing the evaluator summary heavily.
+  - id: diff_quality
+    description: Minimality and cleanliness of the diff — scoped changes, no unrelated churn, idiomatic code.
+  - id: instruction_adherence
+    description: Did the agent follow the instructions — check off TASKS.md items, keep changes minimal, run the tests, stay inside the task list.

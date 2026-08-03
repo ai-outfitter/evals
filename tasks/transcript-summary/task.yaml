@@ -1,0 +1,25 @@
+schema_version: 2
+id: transcript-summary
+kind: transform-judge
+input: input/transcript.txt
+prompt: |
+  The input below is a raw, unedited speech-to-text transcript of a spoken
+  voice memo. Summarize it as Markdown with exactly these sections:
+
+  ## Summary
+  A short paragraph capturing the core argument.
+
+  ## Key points
+  Bullet list of the distinct claims made.
+
+  ## Decisions and action items
+  Bullet list of any decisions or follow-up work implied; write "none" if
+  there are none.
+
+  Do not invent claims that are not in the transcript. Do not quote the
+  disfluencies; write clean prose.
+metrics:
+  - fidelity
+  - coverage
+  - concision
+untrusted: true

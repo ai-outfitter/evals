@@ -1,0 +1,14 @@
+version: "1"
+instructions: |
+  You are comparing two Markdown summaries of the same raw speech-to-text
+  transcript. The transcript is disfluent ASR output; the summaries should be
+  clean prose. Penalize any claim that does not appear in the transcript
+  (hallucination) more heavily than a missing claim. The required sections are
+  Summary, Key points, and Decisions and action items.
+metrics:
+  - id: fidelity
+    description: Every claim in the summary is supported by the transcript; no invented facts, names, or commitments.
+  - id: coverage
+    description: The distinct claims of the transcript are represented; important points are not dropped.
+  - id: concision
+    description: Clean, tight prose in the required section structure; no filler, no transcribed disfluencies.

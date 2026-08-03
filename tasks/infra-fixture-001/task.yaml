@@ -1,0 +1,13 @@
+schema_version: 2
+id: infra-fixture-001
+kind: worktree-repair
+fixture: repo
+prompt: |
+  Repair `normalize_and_sum` in `calculator.py` so it satisfies every
+  requirement in README.md. Run `python3 -m unittest discover -s tests`
+  before finishing.
+evaluator: evaluator/evaluate.py
+evaluator_format: unittest
+metrics:
+  - tests_pass
+untrusted: true

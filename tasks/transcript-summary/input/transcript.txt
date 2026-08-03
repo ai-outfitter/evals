@@ -1,0 +1,13 @@
+ So today I'm talking about A_I_ Outfitter personas which um allow you to review like uh design changes or code or documentation um from the persona from a
+ right, this comes from lean start-up. Um conceptually a persona p persona is not outfit or specific, it can be
+ just a flat, you know, agents dot M_D_ basically describing, you know, who the persona is Typically. we w a persona usually has um a role, like a biography of the person, um
+ and there's one other thing, a role, a biography of a person,
+ and an organisation, right. So you can like quickly mix and match, like John Doe can be a designer at ACMICO um or a researcher, you know, at Weyland, Utah. Um
+ So
+ you know you can you can say like how does my website look or how do these docs read. Um but really you know, Outfitter provides like a mechanism for doing reviews, but fundamentally you don't without Outfitter you can just also think of these personas as like project steering docs, and project steering docs allow
+ you to
+ um sort of like
+ have the agent understand who this thing you're building it for. It helps the agent and helps you right, and that's a kind of the philosophy philosophy we're always trying to get is that like agents
+ our philosophy is that you know we design for humans first and you know we integrate agents into that and so if we think about you know going back to Lean Canvas, the persona helps the human really think about who they're building it for and how things should read, um how technical things should be. Um we often face this with like is this design for an engineer or is this design for you know the finance person who doesn't know what it is. Um
+ So every step of the agentic process right, like you can write specs, you can plan, um you can review like having a persona from the get-go as a project steering doc that kind of helps you know a human and an agent navigate this project um
+ we can we can design for a specific person in mind instead of this amorphous blob.
