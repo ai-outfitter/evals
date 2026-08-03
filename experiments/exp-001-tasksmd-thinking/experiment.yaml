@@ -2,8 +2,8 @@ schema_version: 2
 id: exp-001-tasksmd-thinking
 question: >
   On the TASKS.md calculator task, does raising the thinking level improve
-  outcomes for local models, and how do qwen3:32b, qwen3:4b, and gpt-oss
-  compare when everything else is held constant?
+  outcomes for local models, and how do qwen3:32b, qwen3:4b, and
+  nemotron-3-nano:4b compare when everything else is held constant?
 independent_variables: [model, thinking]
 
 container:
@@ -24,7 +24,7 @@ limits:
   cell_timeout_seconds: 2400
   per_model_overrides:
     "ollama/qwen3:4b":
-      cell_timeout_seconds: 900
+      cell_timeout_seconds: 480
     "ollama/nemotron-3-nano:4b":
       cell_timeout_seconds: 900
 
