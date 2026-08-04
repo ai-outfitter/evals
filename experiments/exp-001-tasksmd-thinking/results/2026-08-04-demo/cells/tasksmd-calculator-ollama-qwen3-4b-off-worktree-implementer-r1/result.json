@@ -1,0 +1,78 @@
+{
+  "artifacts": [
+    "evaluator.json",
+    "evaluator.log",
+    "output.md",
+    "patch.diff",
+    "pi-output.jsonl",
+    "pi-stderr.txt",
+    "request.json"
+  ],
+  "cell_id": "tasksmd-calculator-ollama-qwen3-4b-off-worktree-implementer-r1",
+  "container": {
+    "digest": "sha256:a6738ae527b296a39c93a67748c3d530cbec02f8517d1d0f8774f423be7abc73",
+    "image": "localhost/evals-agent",
+    "network": "host",
+    "runtime": "podman version 5.8.4"
+  },
+  "execution": {
+    "agent_status": "success",
+    "exit_code": 0,
+    "infrastructure_error": null,
+    "session": {
+      "response_models": [],
+      "stop_reason": "stop",
+      "usage": {
+        "cache_read": 0,
+        "cache_write": 0,
+        "input": 2221,
+        "output": 4029,
+        "total_tokens": 6250
+      },
+      "wall_clock_seconds": 509.832
+    }
+  },
+  "experiment": {
+    "id": "exp-001-tasksmd-thinking",
+    "kind": "worktree-tasksmd",
+    "repetition": 1,
+    "task_id": "tasksmd-calculator"
+  },
+  "outcome": {
+    "evaluator_exit_code": 0,
+    "failure_class": "benchmark",
+    "scores": {
+      "tasks_completed": {
+        "max": 5,
+        "value": 0
+      },
+      "tests_pass": {
+        "max": 1,
+        "value": 0
+      }
+    },
+    "status": "fail"
+  },
+  "run": {
+    "collected_at": "2026-08-03T19:41:28Z",
+    "origin": "local",
+    "repository": null,
+    "run_attempt": "1",
+    "run_id": "demo",
+    "source_sha": "7f4f0f2f285801badd25b871cb866e0d0a6e58b9"
+  },
+  "schema_version": 2,
+  "spec_hash": "sha256:cf36e8bce4d2d44ae81424a17c79a5beb24a5c423122fcea4f721fa3476c9699",
+  "variant": {
+    "agent": "worktree-implementer",
+    "harness": "container-pi",
+    "outfitter_version": null,
+    "pi_version": "0.80.10",
+    "provider": "ollama",
+    "requested_model": "qwen3:4b",
+    "thinking": "off",
+    "tools": [
+      "default"
+    ]
+  }
+}

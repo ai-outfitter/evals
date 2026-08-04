@@ -1,0 +1,21 @@
+{
+  "exit_code": 0,
+  "pass": false,
+  "scores": {
+    "tasks_completed": {
+      "max": 5,
+      "value": 0
+    },
+    "tests_pass": {
+      "max": 1,
+      "value": 0
+    }
+  },
+  "tasks": {
+    "boolean_validation": false,
+    "fix_subtract": false,
+    "implement_divide": false,
+    "implement_multiply": false,
+    "readme_usage": false
+  }
+}

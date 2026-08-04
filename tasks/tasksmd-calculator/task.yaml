@@ -1,0 +1,15 @@
+schema_version: 2
+id: tasksmd-calculator
+kind: worktree-tasksmd
+fixture: repo
+prompt: |
+  Read TASKS.md in the repository root and complete every task it lists.
+  Keep each change minimal and scoped to what the task asks for. Check tasks
+  off in TASKS.md as you complete them. Run the public tests with
+  `python3 -m unittest discover -s tests` before finishing.
+evaluator: evaluator/evaluate.py
+evaluator_format: json
+metrics:
+  - tasks_completed
+  - tests_pass
+untrusted: true
