@@ -30,12 +30,16 @@ class PipelineTests(unittest.TestCase):
         return main(list(argv))
 
     def test_transform_pipeline(self):
+        from evals.matrix import expand_matrix
+        from evals.spec import load_experiment
+
         exp = str(EXP_002)
+        expected_cells = len(expand_matrix(load_experiment(EXP_002)))
         self.assertEqual(self.cli("run", exp, "--run-id", self.run_id, "--stub"), 0)
 
         run_dir = REPO / "runs" / "exp-002-transcript-summary" / self.run_id
         results = sorted(run_dir.glob("cells/*/result.json"))
-        self.assertEqual(len(results), 6)
+        self.assertEqual(len(results), expected_cells)
         first = json.loads(results[0].read_text())
         self.assertEqual(first["outcome"]["status"], "unscored")
         self.assertEqual(first["schema_version"], 2)
@@ -62,13 +66,13 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(self.cli("reduce", exp, "--run-id", self.run_id), 0)
         self.assertTrue((run_dir / "report.md").is_file())
         summary = json.loads((run_dir / "results.json").read_text())
-        self.assertEqual(len(summary["cells"]), 6)
+        self.assertEqual(len(summary["cells"]), expected_cells)
 
         from evals.spec import run_paths
 
         paths = run_paths(REPO, "exp-002-transcript-summary", self.run_id)
         manifest = run_bundle(paths, EXP_002)
-        self.assertEqual(len(manifest["bundles"]), 6)
+        self.assertEqual(len(manifest["bundles"]), expected_cells)
         reports = run_validate(paths)
         self.assertTrue(all(report["ok"] for report in reports))
 

@@ -57,6 +57,7 @@ class Provider:
     api_key_literal: str | None
     compat: JsonDict
     models: list[JsonDict]
+    runner: str = "pi-container"
 
     def pi_provider_block(self, *, in_container: bool) -> JsonDict:
         base_url = self.base_url
@@ -107,6 +108,7 @@ class ProviderRegistry:
             "providers": {
                 name: provider.pi_provider_block(in_container=in_container)
                 for name, provider in self.providers.items()
+                if provider.runner == "pi-container"
             }
         }
 
@@ -127,15 +129,19 @@ def load_provider_registry(path: Path) -> ProviderRegistry:
         models = raw.get("models")
         if not isinstance(models, list) or not models:
             raise SpecError(f"provider {name!r} must define a non-empty models list")
+        runner = str(raw.get("runner", "pi-container"))
+        if runner == "pi-container" and "base_url" not in raw:
+            raise SpecError(f"provider {name!r} needs base_url for the pi-container runner")
         providers[name] = Provider(
             name=name,
             api=str(raw.get("api", "openai-completions")),
-            base_url=str(raw["base_url"]),
+            base_url=str(raw.get("base_url", "")),
             base_url_container=raw.get("base_url_container"),
             api_key_env=api_key.get("env"),
             api_key_literal=api_key.get("literal"),
             compat=raw.get("compat", {}),
             models=models,
+            runner=runner,
         )
     return ProviderRegistry(providers=providers)
 

@@ -12,7 +12,7 @@ from typing import Any
 from . import SCHEMA_VERSION
 from .container import AgentRunner, AgentRunRequest
 from .matrix import Cell, spec_hash
-from .pi import build_pi_command, final_assistant_text, utc_now
+from .pi import final_assistant_text, utc_now
 from .spec import Experiment, RunPaths, load_schema, validate_against
 
 JsonDict = dict[str, Any]
@@ -104,7 +104,7 @@ def run_evaluator(experiment: Experiment, worktree: Path, cell_dir: Path) -> Jso
 def run_cell(
     experiment: Experiment,
     cell: Cell,
-    runner: AgentRunner,
+    runners: dict[str, AgentRunner],
     paths: RunPaths,
     *,
     run_id: str,
@@ -132,6 +132,9 @@ def run_cell(
     else:
         workspace.mkdir(parents=True)
 
+    provider = experiment.registry.providers[cell.provider]
+    runner = runners[provider.runner]
+
     agent_dir = cell_dir / "pi-agent"
     agent_dir.mkdir(parents=True)
     in_container = runner.__class__.__name__ != "StubAgentRunner"
@@ -141,16 +144,8 @@ def run_cell(
     )
 
     prompt, no_tools = build_cell_prompt(experiment, None)
-    pi_args = build_pi_command(
-        provider=cell.provider,
-        model=cell.model,
-        thinking=cell.thinking,
-        prompt=prompt,
-        no_tools=no_tools,
-    )
 
     env: dict[str, str] = {}
-    provider = experiment.registry.providers[cell.provider]
     if provider.api_key_env:
         import os
 
@@ -167,7 +162,11 @@ def run_cell(
                 digest=experiment.container_digest,
                 workspace=workspace,
                 agent_dir=agent_dir,
-                pi_args=pi_args,
+                provider=cell.provider,
+                model=cell.model,
+                thinking=cell.thinking,
+                prompt=prompt,
+                no_tools=no_tools,
                 timeout_seconds=cell.timeout_seconds,
                 env=env,
             ),
@@ -253,7 +252,7 @@ def run_cell(
             "repetition": cell.repetition,
         },
         "variant": {
-            "harness": "container-pi",
+            "harness": provider.runner,
             "agent": cell.agent,
             "provider": cell.provider,
             "requested_model": cell.model,

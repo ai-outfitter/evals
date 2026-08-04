@@ -32,6 +32,18 @@ providers:
         reasoning: true
         context_window: 65536
         max_tokens: 8192
+  # Claude Code CLI on the host. It authenticates from the user's own session
+  # and is not in the agent image, so these cells run outside the container
+  # boundary: provider diversity in exchange for weaker isolation. Thinking
+  # maps to MAX_THINKING_TOKENS.
+  claude-cli:
+    runner: claude-cli
+    models:
+      - id: haiku
+        name: Claude Haiku (claude -p)
+        reasoning: true
+        context_window: 200000
+        max_tokens: 8192
   github-models-legacy:
     api: openai-completions
     base_url: https://models.inference.ai.azure.com

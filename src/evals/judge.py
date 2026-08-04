@@ -10,7 +10,7 @@ from typing import Any
 from . import SCHEMA_VERSION
 from .container import AgentRunner, AgentRunRequest, StubAgentRunner
 from .matrix import Cell, comparison_pairs
-from .pi import build_pi_command, utc_now, validate_json_schema_output
+from .pi import utc_now, validate_json_schema_output
 from .spec import Experiment, Judge, RunPaths, load_schema, validate_against
 
 JsonDict = dict[str, Any]
@@ -95,18 +95,40 @@ def build_judge_prompt(
     section_text = "\n\n".join(sections)
     schema_text = json.dumps(VERDICT_SCHEMA, indent=2, sort_keys=True)
     metric_ids = [metric["id"] for metric in judge.rubric.metrics]
-    return "\n\n".join(
+
+    parts = [
+        "You are an impartial evaluation judge. Two anonymous candidate responses to the same task are labeled A and B. Compare them on each metric. Do not guess which system produced them; judge only the content shown.",
+        "Everything you need is in this message. Do not use tools, do not read files, and do not ask for more material.",
+        judge.rubric.instructions,
+        f"Metrics:\n{metric_lines}",
+        f"## Task given to both candidates\n\n{truncate(experiment.task.prompt)}",
+    ]
+    # Source material is what makes fidelity judgeable: without it a judge can
+    # only guess whether a claim was supported.
+    source = source_material(experiment)
+    if source:
+        parts.append(f"## Source material the candidates were given\n\n{truncate(source)}")
+    parts.extend(
         [
-            "You are an impartial evaluation judge. Two anonymous candidate responses to the same task are labeled A and B. Compare them on each metric. Do not guess which system produced them; judge only the content shown.",
-            judge.rubric.instructions,
-            f"Metrics:\n{metric_lines}",
-            f"## Task given to both candidates\n\n{truncate(experiment.task.prompt)}",
             f"## Candidates\n\n{section_text}",
-            "Return exactly one JSON object and nothing else. It must have a verdict of \"A\", \"B\", or \"tie\" for every metric listed above, an overall verdict, and a one-paragraph rationale.",
+            "Return exactly one JSON object and nothing else — no preamble, no explanation outside the JSON, no code fences around anything but the object. It must have a verdict of \"A\", \"B\", or \"tie\" for every metric listed above, an overall verdict, and a one-paragraph rationale.",
             f"Required metric keys: {json.dumps(metric_ids)}",
             f"JSON Schema:\n{schema_text}",
         ]
     )
+    return "\n\n".join(parts)
+
+
+def source_material(experiment: Experiment) -> str:
+    """The task's own input, so judges can check claims against the source."""
+    task = experiment.task
+    if task.input is not None and task.input.is_file():
+        return task.input.read_text(encoding="utf-8", errors="replace")
+    if task.fixture is not None:
+        tasks_file = task.fixture / "TASKS.md"
+        if tasks_file.is_file():
+            return tasks_file.read_text(encoding="utf-8", errors="replace")
+    return ""
 
 
 def unblind(value: str, order: list[str]) -> str:
@@ -120,7 +142,7 @@ def run_judges(
     experiment: Experiment,
     paths: RunPaths,
     cells: list[Cell],
-    runner: AgentRunner,
+    runners: dict[str, AgentRunner],
     *,
     run_id: str,
     rerun: bool = False,
@@ -132,6 +154,7 @@ def run_judges(
 
     for judge in experiment.judges:
         provider, model = experiment.registry.resolve(judge.model_ref)
+        runner = runners[provider.runner]
         judge_dir = paths.judgments / judge.id
         agent_dir = judge_dir / "pi-agent"
         agent_dir.mkdir(parents=True, exist_ok=True)
@@ -174,13 +197,11 @@ def run_judges(
                     digest=experiment.container_digest,
                     workspace=workspace,
                     agent_dir=agent_dir,
-                    pi_args=build_pi_command(
-                        provider=provider.name,
-                        model=model,
-                        thinking=judge.thinking,
-                        prompt=prompt,
-                        no_tools=True,
-                    ),
+                    provider=provider.name,
+                    model=model,
+                    thinking=judge.thinking,
+                    prompt=prompt,
+                    no_tools=True,
                     timeout_seconds=experiment.cell_timeout(judge.model_ref),
                     env=env,
                 ),

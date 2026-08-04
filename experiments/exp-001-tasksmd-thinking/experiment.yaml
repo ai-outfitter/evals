@@ -13,7 +13,7 @@ container:
 providers: ../../models.yaml
 
 matrix:
-  model: ["ollama/qwen3:32b", "ollama/qwen3:4b", "ollama/nemotron-3-nano:4b"]
+  model: ["ollama/qwen3:32b", "ollama/qwen3:4b", "ollama/nemotron-3-nano:4b", "claude-cli/haiku"]
   thinking: [off, low, high]
   agent: [worktree-implementer]
   repetitions: 1
@@ -27,6 +27,8 @@ limits:
       cell_timeout_seconds: 480
     "ollama/nemotron-3-nano:4b":
       cell_timeout_seconds: 900
+    "claude-cli/haiku":
+      cell_timeout_seconds: 600
 
 judges:
   - id: judge-qwen4b
@@ -35,6 +37,12 @@ judges:
     rubric: ../../judges/tasksmd-rubric.yaml
   - id: judge-nemotron
     model: "ollama/nemotron-3-nano:4b"
+    thinking: off
+    rubric: ../../judges/tasksmd-rubric.yaml
+  # Held-out judge: a different provider and vendor from every contestant
+  # except the haiku cells, and the only judge not in the 4b weight class.
+  - id: judge-haiku
+    model: "claude-cli/haiku"
     thinking: off
     rubric: ../../judges/tasksmd-rubric.yaml
 

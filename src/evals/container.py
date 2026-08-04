@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from .pi import parse_pi_output, utc_now
+from .pi import build_pi_command, parse_pi_output, utc_now
 
 JsonDict = dict[str, Any]
 
@@ -86,7 +86,11 @@ class AgentRunRequest:
     digest: str | None
     workspace: Path
     agent_dir: Path
-    pi_args: list[str]
+    provider: str
+    model: str
+    thinking: str
+    prompt: str
+    no_tools: bool
     timeout_seconds: float
     env: dict[str, str]
 
@@ -128,7 +132,15 @@ class PodmanAgentRunner:
         for key, value in request.env.items():
             command.extend(["-e", f"{key}={value}"])
         command.append(image_reference(request.image, request.digest))
-        command.extend(request.pi_args)
+        command.extend(
+            build_pi_command(
+                provider=request.provider,
+                model=request.model,
+                thinking=request.thinking,
+                prompt=request.prompt,
+                no_tools=request.no_tools,
+            )
+        )
 
         started_at = utc_now()
         started_perf = time.perf_counter()
@@ -214,14 +226,14 @@ class StubAgentRunner:
     def run(self, request: AgentRunRequest, artifact_dir: Path) -> JsonDict:
         artifact_dir.mkdir(parents=True, exist_ok=True)
         marker = request.workspace / "STUB.md"
-        signature = " ".join(request.pi_args[-1:])[:64]
-        variant = "-".join(request.pi_args[:8])
+        signature = request.prompt[:64]
+        variant = f"{request.provider}-{request.model}-{request.thinking}"
         marker.write_text(f"stub edit for {variant}\n", encoding="utf-8")
         text = f"Stub response ({variant}) for prompt: {signature}"
         (artifact_dir / "pi-output.jsonl").write_text("", encoding="utf-8")
         (artifact_dir / "pi-stderr.txt").write_text("", encoding="utf-8")
         (artifact_dir / "request.json").write_text(
-            json.dumps({"command": ["stub", *request.pi_args]}, indent=2) + "\n", encoding="utf-8"
+            json.dumps({"command": ["stub", variant]}, indent=2) + "\n", encoding="utf-8"
         )
         return {
             "agent_status": "success",
@@ -240,6 +252,123 @@ class StubAgentRunner:
 
     def pi_version(self, image: str, digest: str | None) -> str | None:
         return "stub"
+
+
+class ClaudeAgentRunner:
+    """Runs `claude -p` directly on the host.
+
+    Claude Code is not in the agent image and authenticates from the host
+    user's session, so these cells trade the container boundary for provider
+    diversity. Tool-using (worktree) cells run with acceptEdits confined to
+    the workspace; no-tools cells disallow all tools. Thinking maps to the
+    MAX_THINKING_TOKENS environment variable (off -> unset).
+    """
+
+    network = "host-direct"
+    thinking_budgets = {"minimal": 1024, "low": 4096, "medium": 8192, "high": 16384}
+
+    def run(self, request: AgentRunRequest, artifact_dir: Path) -> JsonDict:
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        # The prompt goes on stdin: --disallowedTools takes a variadic list and
+        # would otherwise swallow a positional prompt argument.
+        command = ["claude", "-p", "--model", request.model, "--output-format", "json"]
+        if request.no_tools:
+            command.extend(["--disallowedTools", "*"])
+        else:
+            command.extend(["--permission-mode", "acceptEdits"])
+
+        env = os.environ.copy()
+        env.update(request.env)
+        if request.thinking in self.thinking_budgets:
+            env["MAX_THINKING_TOKENS"] = str(self.thinking_budgets[request.thinking])
+
+        started_at = utc_now()
+        started_perf = time.perf_counter()
+        timed_out = False
+        try:
+            completed = subprocess.run(
+                command,
+                input=request.prompt,
+                capture_output=True,
+                text=True,
+                timeout=request.timeout_seconds,
+                cwd=request.workspace,
+                env=env,
+                check=False,
+            )
+            stdout, stderr, exit_code = completed.stdout, completed.stderr, completed.returncode
+        except subprocess.TimeoutExpired as exc:
+            timed_out = True
+            stdout = _coerce_text(exc.stdout)
+            stderr = _coerce_text(exc.stderr)
+            exit_code = None
+        wall_clock = round(time.perf_counter() - started_perf, 3)
+
+        (artifact_dir / "pi-output.jsonl").write_text(stdout, encoding="utf-8")
+        (artifact_dir / "pi-stderr.txt").write_text(stderr, encoding="utf-8")
+        (artifact_dir / "request.json").write_text(
+            json.dumps(
+                {
+                    "command": command,
+                    "runner": "claude-cli",
+                    "thinking_env": env.get("MAX_THINKING_TOKENS"),
+                    "started_at": started_at,
+                    "finished_at": utc_now(),
+                    "timeout_seconds": request.timeout_seconds,
+                    "timed_out": timed_out,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        payload: JsonDict = {}
+        try:
+            payload = json.loads(stdout) if stdout.strip() else {}
+        except json.JSONDecodeError:
+            payload = {}
+        result_text = str(payload.get("result", "") or "")
+        is_error = bool(payload.get("is_error", True))
+        usage_raw = payload.get("usage", {}) if isinstance(payload.get("usage"), dict) else {}
+        usage = {
+            "input": int(usage_raw.get("input_tokens", 0) or 0),
+            "output": int(usage_raw.get("output_tokens", 0) or 0),
+            "cache_read": int(usage_raw.get("cache_read_input_tokens", 0) or 0),
+            "cache_write": int(usage_raw.get("cache_creation_input_tokens", 0) or 0),
+            "total_tokens": int(usage_raw.get("input_tokens", 0) or 0)
+            + int(usage_raw.get("output_tokens", 0) or 0),
+        }
+        model_usage = payload.get("modelUsage")
+        response_models = sorted(model_usage) if isinstance(model_usage, dict) else []
+
+        if timed_out:
+            agent_status = "timeout"
+        elif exit_code == 0 and result_text and not is_error:
+            agent_status = "success"
+        else:
+            agent_status = "error"
+        return {
+            "agent_status": agent_status,
+            "exit_code": exit_code,
+            "wall_clock_seconds": wall_clock,
+            "network": self.network,
+            "usage": usage,
+            "chat_history": [
+                {"role": "user", "text": request.prompt},
+                {"role": "assistant", "text": result_text},
+            ],
+            "response_models": response_models,
+            "stop_reason": payload.get("stop_reason"),
+            "parse_errors": [],
+        }
+
+    def pi_version(self, image: str, digest: str | None) -> str | None:
+        completed = subprocess.run(
+            ["claude", "--version"], capture_output=True, text=True, check=False
+        )
+        return completed.stdout.strip() or None if completed.returncode == 0 else None
 
 
 def _coerce_text(value: str | bytes | None) -> str:

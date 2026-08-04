@@ -16,7 +16,14 @@ class MatrixTests(unittest.TestCase):
     def test_expansion_counts(self):
         experiment = load_experiment(EXP_001)
         cells = expand_matrix(experiment)
-        self.assertEqual(len(cells), 9)  # 3 models x 3 thinking x 1 agent x 1 rep
+        matrix = experiment.matrix
+        expected = (
+            len(matrix["model"])
+            * len(matrix["thinking"])
+            * len(matrix["agent"])
+            * int(matrix.get("repetitions", 1))
+        )
+        self.assertEqual(len(cells), expected)
 
     def test_cell_ids_unique_and_slugged(self):
         experiment = load_experiment(EXP_002)
@@ -32,6 +39,14 @@ class MatrixTests(unittest.TestCase):
         hashes = {spec_hash(experiment, cell) for cell in cells}
         self.assertEqual(len(hashes), len(cells))
         self.assertEqual(spec_hash(experiment, cells[0]), spec_hash(experiment, cells[0]))
+
+    def test_multiple_runners_expand(self):
+        experiment = load_experiment(EXP_001)
+        runners = {
+            experiment.registry.providers[cell.provider].runner
+            for cell in expand_matrix(experiment)
+        }
+        self.assertEqual(runners, {"pi-container", "claude-cli"})
 
     def test_filters(self):
         experiment = load_experiment(EXP_001)

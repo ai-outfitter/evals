@@ -11,6 +11,8 @@ from pathlib import Path
 from .bundle import BundleError, run_bundle, run_validate
 from .collect import run_cell
 from .container import (
+    AgentRunner,
+    ClaudeAgentRunner,
     ContainerError,
     PodmanAgentRunner,
     StubAgentRunner,
@@ -28,6 +30,14 @@ def add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("experiment", type=Path, help="path to experiment.yaml")
     parser.add_argument("--run-id", default="default", help="run directory name (default: default)")
     parser.add_argument("--stub", action="store_true", help="deterministic no-model, no-container mode")
+
+
+def build_runners(*, stub: bool) -> dict[str, AgentRunner]:
+    """One runner per provider `runner:` kind declared in the registry."""
+    if stub:
+        shared = StubAgentRunner()
+        return {"pi-container": shared, "claude-cli": shared}
+    return {"pi-container": PodmanAgentRunner(), "claude-cli": ClaudeAgentRunner()}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -115,15 +125,20 @@ def dispatch(args: argparse.Namespace) -> int:
         if not cells:
             print("no cells match the filters", file=sys.stderr)
             return 1
-        if args.stub:
-            runner: PodmanAgentRunner | StubAgentRunner = StubAgentRunner()
+        runners = build_runners(stub=args.stub)
+        needs_container = any(
+            experiment.registry.providers[cell.provider].runner == "pi-container"
+            for cell in cells
+        )
+        if args.stub or not needs_container:
             digest = experiment.container_digest
-            pi_version = runner.pi_version(experiment.container_image, digest)
-            observed_runtime = "stub"
+            pi_version = runners["pi-container"].pi_version(experiment.container_image, digest)
+            observed_runtime = "stub" if args.stub else None
         else:
-            runner = PodmanAgentRunner()
             digest = verify_digest(experiment.container_image, experiment.container_digest)
-            pi_version = runner.pi_version(experiment.container_image, experiment.container_digest)
+            pi_version = runners["pi-container"].pi_version(
+                experiment.container_image, experiment.container_digest
+            )
             observed_runtime = runtime_version()
         paths.cells.mkdir(parents=True, exist_ok=True)
         failures = 0
@@ -132,7 +147,7 @@ def dispatch(args: argparse.Namespace) -> int:
             outcome = run_cell(
                 experiment,
                 cell,
-                runner,
+                runners,
                 paths,
                 run_id=args.run_id,
                 observed_image_digest=digest,
@@ -148,11 +163,15 @@ def dispatch(args: argparse.Namespace) -> int:
 
     if args.command == "judge":
         cells = expand_matrix(experiment)
-        runner = StubAgentRunner() if args.stub else PodmanAgentRunner()
-        if not args.stub:
+        runners = build_runners(stub=args.stub)
+        needs_container = any(
+            experiment.registry.resolve(judge.model_ref)[0].runner == "pi-container"
+            for judge in experiment.judges
+        )
+        if not args.stub and needs_container:
             verify_digest(experiment.container_image, experiment.container_digest)
         records = run_judges(
-            experiment, paths, cells, runner, run_id=args.run_id, rerun=args.rerun
+            experiment, paths, cells, runners, run_id=args.run_id, rerun=args.rerun
         )
         for record in records:
             print(f"{record['judge']}  {record['pair']}  {record['status']}")
@@ -188,11 +207,15 @@ def dispatch(args: argparse.Namespace) -> int:
 
     if args.command == "smoke":
         from .container import AgentRunRequest
-        from .pi import build_pi_command, final_assistant_text
+        from .pi import final_assistant_text
 
         provider, model = experiment.registry.resolve(args.model_ref)
-        runner = PodmanAgentRunner()
-        digest = verify_digest(experiment.container_image, experiment.container_digest)
+        runner = build_runners(stub=False)[provider.runner]
+        digest = (
+            verify_digest(experiment.container_image, experiment.container_digest)
+            if provider.runner == "pi-container"
+            else None
+        )
         import tempfile
 
         with tempfile.TemporaryDirectory(prefix="evals-smoke-") as temp:
@@ -212,13 +235,11 @@ def dispatch(args: argparse.Namespace) -> int:
                     digest=experiment.container_digest,
                     workspace=workspace,
                     agent_dir=agent_dir,
-                    pi_args=build_pi_command(
-                        provider=provider.name,
-                        model=model,
-                        thinking="off",
-                        prompt="Reply with exactly: ok",
-                        no_tools=True,
-                    ),
+                    provider=provider.name,
+                    model=model,
+                    thinking="off",
+                    prompt="Reply with exactly: ok",
+                    no_tools=True,
                     timeout_seconds=120,
                     env=env,
                 ),
