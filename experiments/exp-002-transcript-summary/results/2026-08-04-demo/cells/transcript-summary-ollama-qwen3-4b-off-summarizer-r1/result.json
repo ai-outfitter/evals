@@ -1,0 +1,64 @@
+{
+  "artifacts": [
+    "output.md",
+    "pi-output.jsonl",
+    "pi-stderr.txt",
+    "request.json"
+  ],
+  "cell_id": "transcript-summary-ollama-qwen3-4b-off-summarizer-r1",
+  "container": {
+    "digest": "sha256:a6738ae527b296a39c93a67748c3d530cbec02f8517d1d0f8774f423be7abc73",
+    "image": "localhost/evals-agent",
+    "network": "host",
+    "runtime": "podman version 5.8.4"
+  },
+  "execution": {
+    "agent_status": "success",
+    "exit_code": 0,
+    "infrastructure_error": null,
+    "session": {
+      "response_models": [],
+      "stop_reason": "stop",
+      "usage": {
+        "cache_read": 0,
+        "cache_write": 0,
+        "input": 1010,
+        "output": 2916,
+        "total_tokens": 3926
+      },
+      "wall_clock_seconds": 36.609
+    }
+  },
+  "experiment": {
+    "id": "exp-002-transcript-summary",
+    "kind": "transform-judge",
+    "repetition": 1,
+    "task_id": "transcript-summary"
+  },
+  "outcome": {
+    "evaluator_exit_code": null,
+    "failure_class": "none",
+    "scores": {},
+    "status": "unscored"
+  },
+  "run": {
+    "collected_at": "2026-08-03T19:19:28Z",
+    "origin": "local",
+    "repository": null,
+    "run_attempt": "1",
+    "run_id": "demo",
+    "source_sha": "7f4f0f2f285801badd25b871cb866e0d0a6e58b9"
+  },
+  "schema_version": 2,
+  "spec_hash": "sha256:4e1e7054cbc0158331b95f1d35611636c3bf1533115d911b81d0a75db7d4383c",
+  "variant": {
+    "agent": "summarizer",
+    "harness": "container-pi",
+    "outfitter_version": null,
+    "pi_version": "0.80.10",
+    "provider": "ollama",
+    "requested_model": "qwen3:4b",
+    "thinking": "off",
+    "tools": []
+  }
+}

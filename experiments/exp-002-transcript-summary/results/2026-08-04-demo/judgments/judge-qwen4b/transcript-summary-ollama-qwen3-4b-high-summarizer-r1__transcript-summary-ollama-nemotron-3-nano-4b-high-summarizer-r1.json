@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 30512261456739,
+    "left": "transcript-summary-ollama-qwen3-4b-high-summarizer-r1",
+    "presented_order": [
+      "right",
+      "left"
+    ],
+    "right": "transcript-summary-ollama-nemotron-3-nano-4b-high-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-qwen4b",
+    "model": "ollama/qwen3:4b",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "right",
+    "coverage": "left",
+    "fidelity": "tie"
+  },
+  "overall_preference": "left",
+  "rationale": "Both responses exhibit perfect fidelity (no hallucinations). Response B covers critical context about lean startup origins missed by A while maintaining concision; the coverage advantage outweighs A's tighter prose, as missing key context (lean startup) undermines completeness.",
+  "raw_output_ref": "judgments/judge-qwen4b/transcript-summary-ollama-qwen3-4b-high-summarizer-r1__transcript-summary-ollama-nemotron-3-nano-4b-high-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:26:29Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

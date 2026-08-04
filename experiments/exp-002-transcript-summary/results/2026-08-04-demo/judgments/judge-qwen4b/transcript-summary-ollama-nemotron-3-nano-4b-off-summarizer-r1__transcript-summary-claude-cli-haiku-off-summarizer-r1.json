@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 58603334144108,
+    "left": "transcript-summary-ollama-nemotron-3-nano-4b-off-summarizer-r1",
+    "presented_order": [
+      "left",
+      "right"
+    ],
+    "right": "transcript-summary-claude-cli-haiku-off-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-qwen4b",
+    "model": "ollama/qwen3:4b",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "right",
+    "coverage": "right",
+    "fidelity": "left"
+  },
+  "overall_preference": "right",
+  "rationale": "Response A hallucinated 'AI' (transcript says 'A_I_') and missed 'lean start-up' origin in coverage. Response B correctly used 'A_I_' (fidelity), included lean start-up context (coverage), and had tighter prose (concision).",
+  "raw_output_ref": "judgments/judge-qwen4b/transcript-summary-ollama-nemotron-3-nano-4b-off-summarizer-r1__transcript-summary-claude-cli-haiku-off-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:30:16Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

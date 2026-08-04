@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 154154512636152,
+    "left": "transcript-summary-ollama-qwen3-4b-off-summarizer-r1",
+    "presented_order": [
+      "left",
+      "right"
+    ],
+    "right": "transcript-summary-claude-cli-haiku-off-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-haiku",
+    "model": "claude-cli/haiku",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "right",
+    "coverage": "right",
+    "fidelity": "tie"
+  },
+  "overall_preference": "right",
+  "rationale": "Both responses accurately represent the transcript with no hallucinations or unsupported claims, earning a fidelity tie. However, Response B provides notably better coverage, explicitly capturing distinct claims that Response A omits: the flexible mixing-and-matching capability (same person can be a designer at one company or researcher at another), the application across multiple project phases (specs, planning, and review\u2014not just review), explicit guidance on technical tone and communication style, and clearer articulation of the human-centered design philosophy. On concision, both maintain clean, tight prose without filler or transcribed disfluencies. While Response A's summary is marginally shorter (53 vs. 59 words), Response B's individual bullet points are lean and specific, with no unnecessary elaboration. The greater length in Response B reflects substantive coverage of distinct claims rather than verbosity. Response B achieves superior efficiency in conveying the transcript's full meaning without sacrificing prose quality.",
+  "raw_output_ref": "judgments/judge-haiku/transcript-summary-ollama-qwen3-4b-off-summarizer-r1__transcript-summary-claude-cli-haiku-off-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:43:11Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

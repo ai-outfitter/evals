@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 16442919349591,
+    "left": "transcript-summary-claude-cli-haiku-off-summarizer-r1",
+    "presented_order": [
+      "right",
+      "left"
+    ],
+    "right": "transcript-summary-claude-cli-haiku-high-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-haiku",
+    "model": "claude-cli/haiku",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "tie",
+    "coverage": "tie",
+    "fidelity": "left"
+  },
+  "overall_preference": "left",
+  "rationale": "Both responses capture the core concepts and maintain clean prose without transcribed disfluencies. Coverage is equivalent: each identifies the key claims about personas, their structure (role, biography, organization), their function as project steering docs, the lean startup origin, and their application across the development lifecycle. Concision is also comparable\u2014both use eight well-organized bullet points and similarly tight summary paragraphs. However, Response A contains a fidelity error: it states 'John Doe as designer at ACME' when the transcript explicitly says 'ACMICO.' This is a hallucination of a different company name not present in the source material. Response B avoids this by using a generic formulation ('designer at one company or a researcher at another') that captures the concept without introducing inaccuracies. Given the instruction to penalize hallucinations more heavily than missing claims, this fidelity violation is decisive.",
+  "raw_output_ref": "judgments/judge-haiku/transcript-summary-claude-cli-haiku-off-summarizer-r1__transcript-summary-claude-cli-haiku-high-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:46:55Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

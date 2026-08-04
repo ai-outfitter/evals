@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 212155884532018,
+    "left": "transcript-summary-ollama-qwen3-32b-high-summarizer-r1",
+    "presented_order": [
+      "left",
+      "right"
+    ],
+    "right": "transcript-summary-ollama-qwen3-4b-high-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-haiku",
+    "model": "claude-cli/haiku",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "right",
+    "coverage": "right",
+    "fidelity": "right"
+  },
+  "overall_preference": "right",
+  "rationale": "Both responses accurately represent the transcript without hallucinations, but Response B is superior on all three metrics. On fidelity, B more precisely distinguishes personas as project steering documents from Outfitter as a tool, directly addressing the transcript's point that personas function 'even without Outfitter.' On coverage, B explicitly mentions personas as 'flat descriptions' (matching the transcript's language), captures the independence of the concept from the tool in its key points, and focuses on the primary use case of reviewing from specific perspectives. On concision, B delivers equivalent content in approximately 58-62 words versus A's 75-80 words in the summary, uses 4 key points instead of 5, and achieves tighter overall prose. Response A is well-written but more expansive and less explicitly captures the nuance that personas are a core concept that predates or exceeds Outfitter's role as an implementation mechanism.",
+  "raw_output_ref": "judgments/judge-haiku/transcript-summary-ollama-qwen3-32b-high-summarizer-r1__transcript-summary-ollama-qwen3-4b-high-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:38:54Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

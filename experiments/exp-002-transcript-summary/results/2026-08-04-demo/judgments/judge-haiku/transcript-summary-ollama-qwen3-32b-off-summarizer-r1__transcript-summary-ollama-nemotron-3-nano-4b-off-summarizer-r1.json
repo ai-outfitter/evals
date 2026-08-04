@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 83538638491856,
+    "left": "transcript-summary-ollama-qwen3-32b-off-summarizer-r1",
+    "presented_order": [
+      "left",
+      "right"
+    ],
+    "right": "transcript-summary-ollama-nemotron-3-nano-4b-off-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-haiku",
+    "model": "claude-cli/haiku",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "left",
+    "coverage": "left",
+    "fidelity": "left"
+  },
+  "overall_preference": "left",
+  "rationale": "Response A provides more faithful and comprehensive coverage of the source material. Both responses accurately capture the persona concept, its role, biography, and organization components, and the project-steering philosophy. However, Response B contains an interpretive phrase\u2014'not merely as UI outfitters'\u2014that adds speculation not clearly grounded in the transcript, where the point is that personas are useful independently of the Outfitter tool, not that they lack a UI dimension. More significantly, Response B omits the explicit lean start-up origin mentioned in the transcript ('this comes from lean start-up'), which is a notable coverage gap. Response A includes this origin and also better captures the 'amorphous blob' concept in its framing. Both responses are concise and well-structured, but Response A achieves this without the interpretive flourishes that make Response B slightly less precise.",
+  "raw_output_ref": "judgments/judge-haiku/transcript-summary-ollama-qwen3-32b-off-summarizer-r1__transcript-summary-ollama-nemotron-3-nano-4b-off-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:37:31Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

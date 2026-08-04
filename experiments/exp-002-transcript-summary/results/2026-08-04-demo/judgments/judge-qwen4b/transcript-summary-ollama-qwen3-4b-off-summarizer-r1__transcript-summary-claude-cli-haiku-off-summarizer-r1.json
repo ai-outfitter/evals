@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 268087661174246,
+    "left": "transcript-summary-ollama-qwen3-4b-off-summarizer-r1",
+    "presented_order": [
+      "left",
+      "right"
+    ],
+    "right": "transcript-summary-claude-cli-haiku-off-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-qwen4b",
+    "model": "ollama/qwen3:4b",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "left",
+    "coverage": "right",
+    "fidelity": "tie"
+  },
+  "overall_preference": "tie",
+  "rationale": "Both responses maintain fidelity (no hallucinations). Response B covers more distinct claims from the transcript (e.g., phase-specific guidance and technical level determination), while Response A is more concise. Coverage and concision metrics are split, leading to a tie overall.",
+  "raw_output_ref": "judgments/judge-qwen4b/transcript-summary-ollama-qwen3-4b-off-summarizer-r1__transcript-summary-claude-cli-haiku-off-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:25:15Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

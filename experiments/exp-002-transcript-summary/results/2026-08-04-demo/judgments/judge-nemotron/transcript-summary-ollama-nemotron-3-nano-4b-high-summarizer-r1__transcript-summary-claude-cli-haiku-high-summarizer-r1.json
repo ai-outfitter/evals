@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 9249213009747,
+    "left": "transcript-summary-ollama-nemotron-3-nano-4b-high-summarizer-r1",
+    "presented_order": [
+      "right",
+      "left"
+    ],
+    "right": "transcript-summary-claude-cli-haiku-high-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-nemotron",
+    "model": "ollama/nemotron-3-nano:4b",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "tie",
+    "coverage": "tie",
+    "fidelity": "tie"
+  },
+  "overall_preference": "tie",
+  "rationale": "Both candidates correctly reflect the transcript without hallucinated claims, cover its main points\u2014personas provide role, biography, organization information; reused across companies; serve as project steering/steering docs to align human and agent input; are used throughout the process\u2014and use clear, concise prose with no unnecessary filler. Hence each metric is tied.",
+  "raw_output_ref": "judgments/judge-nemotron/transcript-summary-ollama-nemotron-3-nano-4b-high-summarizer-r1__transcript-summary-claude-cli-haiku-high-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:35:16Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}
