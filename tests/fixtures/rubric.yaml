@@ -1,0 +1,9 @@
+version: "1"
+instructions: |
+  Test rubric. Compare two candidate outputs on the metrics below. This rubric
+  exists to exercise the harness; it makes no claim about output quality.
+metrics:
+  - id: accuracy
+    description: Whether the claims made are supported by the source material.
+  - id: brevity
+    description: Whether the response says what it needs to without filler.

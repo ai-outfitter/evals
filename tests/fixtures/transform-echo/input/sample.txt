@@ -1,0 +1,3 @@
+The harness runs each matrix cell in its own workspace. A cell records the
+model, the thinking level, the container digest, and the observed runtime
+versions. Nothing else about the run is inferred after the fact.

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-outfitter.dev/schemas/evals-preference/v2",
+  "title": "Evals human preference",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "type", "rater", "comparison", "metrics", "overall_preference", "recorded_at"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "type": {"const": "human_preference"},
+    "rater": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {"id": {"type": "string"}}
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "right", "blinding_seed", "presented_order"],
+      "properties": {
+        "left": {"type": "string"},
+        "right": {"type": "string"},
+        "blinding_seed": {"type": "integer"},
+        "presented_order": {
+          "type": "array",
+          "items": {"enum": ["left", "right"]},
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"enum": ["left", "right", "tie"]}
+    },
+    "overall_preference": {"enum": ["left", "right", "tie"]},
+    "recorded_at": {"type": "string"}
+  }
+}
