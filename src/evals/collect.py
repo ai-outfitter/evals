@@ -109,7 +109,7 @@ def run_cell(
     *,
     run_id: str,
     observed_image_digest: str | None,
-    pi_version: str | None,
+    agent_versions: dict[str, str | None],
     runtime_version: str | None,
     rerun: bool = False,
     keep_workspaces: bool = False,
@@ -137,7 +137,7 @@ def run_cell(
 
     agent_dir = cell_dir / "pi-agent"
     agent_dir.mkdir(parents=True)
-    in_container = runner.__class__.__name__ != "StubAgentRunner"
+    in_container = runner.renders_container_urls
     (agent_dir / "models.json").write_text(
         json.dumps(experiment.registry.pi_models_json(in_container=in_container), indent=2) + "\n",
         encoding="utf-8",
@@ -257,7 +257,7 @@ def run_cell(
             "provider": cell.provider,
             "requested_model": cell.model,
             "thinking": cell.thinking,
-            "pi_version": pi_version,
+            "agent_version": agent_versions.get(provider.runner),
             "outfitter_version": None,
             "tools": [] if no_tools else ["default"],
         },

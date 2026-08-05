@@ -104,6 +104,9 @@ class PodmanAgentRunner:
     """Runs `pi` inside the pinned container image."""
 
     network = "host"
+    # Pi resolves provider base URLs from inside the container.
+    renders_container_urls = True
+    needs_image = True
 
     def run(self, request: AgentRunRequest, artifact_dir: Path) -> JsonDict:
         artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -197,7 +200,7 @@ class PodmanAgentRunner:
             **parsed,
         }
 
-    def pi_version(self, image: str, digest: str | None) -> str | None:
+    def agent_version(self, image: str, digest: str | None) -> str | None:
         completed = subprocess.run(
             [
                 runtime_binary(),
@@ -222,6 +225,8 @@ class StubAgentRunner:
     """Deterministic no-model runner for check.sh and tests."""
 
     network = "stub"
+    renders_container_urls = False
+    needs_image = False
 
     def run(self, request: AgentRunRequest, artifact_dir: Path) -> JsonDict:
         artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -250,7 +255,7 @@ class StubAgentRunner:
             "parse_errors": [],
         }
 
-    def pi_version(self, image: str, digest: str | None) -> str | None:
+    def agent_version(self, image: str, digest: str | None) -> str | None:
         return "stub"
 
 
@@ -265,6 +270,9 @@ class ClaudeAgentRunner:
     """
 
     network = "host-direct"
+    # Claude Code runs on the host and never reads the projected models.json.
+    renders_container_urls = False
+    needs_image = False
     thinking_budgets = {"minimal": 1024, "low": 4096, "medium": 8192, "high": 16384}
 
     def run(self, request: AgentRunRequest, artifact_dir: Path) -> JsonDict:
@@ -364,7 +372,7 @@ class ClaudeAgentRunner:
             "parse_errors": [],
         }
 
-    def pi_version(self, image: str, digest: str | None) -> str | None:
+    def agent_version(self, image: str, digest: str | None) -> str | None:
         completed = subprocess.run(
             ["claude", "--version"], capture_output=True, text=True, check=False
         )

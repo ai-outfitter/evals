@@ -43,7 +43,7 @@
         "provider": {"type": "string"},
         "requested_model": {"type": "string"},
         "thinking": {"type": "string"},
-        "pi_version": {"type": ["string", "null"]},
+        "agent_version": {"type": ["string", "null"]},
         "outfitter_version": {"type": ["string", "null"]},
         "tools": {"type": "array", "items": {"type": "string"}}
       }

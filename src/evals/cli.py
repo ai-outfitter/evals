@@ -126,20 +126,22 @@ def dispatch(args: argparse.Namespace) -> int:
             print("no cells match the filters", file=sys.stderr)
             return 1
         runners = build_runners(stub=args.stub)
-        needs_container = any(
-            experiment.registry.providers[cell.provider].runner == "pi-container"
-            for cell in cells
-        )
-        if args.stub or not needs_container:
-            digest = experiment.container_digest
-            pi_version = runners["pi-container"].pi_version(experiment.container_image, digest)
-            observed_runtime = "stub" if args.stub else None
-        else:
+        # Only touch the runner kinds these cells actually use: a claude-cli-only
+        # run must not require a container runtime to be installed.
+        kinds = {experiment.registry.providers[cell.provider].runner for cell in cells}
+        needs_image = any(runners[kind].needs_image for kind in kinds)
+        if needs_image:
             digest = verify_digest(experiment.container_image, experiment.container_digest)
-            pi_version = runners["pi-container"].pi_version(
+            observed_runtime = runtime_version()
+        else:
+            digest = experiment.container_digest
+            observed_runtime = "stub" if args.stub else None
+        agent_versions = {
+            kind: runners[kind].agent_version(
                 experiment.container_image, experiment.container_digest
             )
-            observed_runtime = runtime_version()
+            for kind in kinds
+        }
         paths.cells.mkdir(parents=True, exist_ok=True)
         failures = 0
         for index, cell in enumerate(cells, start=1):
@@ -151,7 +153,7 @@ def dispatch(args: argparse.Namespace) -> int:
                 paths,
                 run_id=args.run_id,
                 observed_image_digest=digest,
-                pi_version=pi_version,
+                agent_versions=agent_versions,
                 runtime_version=observed_runtime,
                 rerun=args.rerun,
                 keep_workspaces=args.keep_workspaces,
@@ -164,11 +166,11 @@ def dispatch(args: argparse.Namespace) -> int:
     if args.command == "judge":
         cells = expand_matrix(experiment)
         runners = build_runners(stub=args.stub)
-        needs_container = any(
-            experiment.registry.resolve(judge.model_ref)[0].runner == "pi-container"
+        needs_image = any(
+            runners[experiment.registry.resolve(judge.model_ref)[0].runner].needs_image
             for judge in experiment.judges
         )
-        if not args.stub and needs_container:
+        if needs_image:
             verify_digest(experiment.container_image, experiment.container_digest)
         records = run_judges(
             experiment, paths, cells, runners, run_id=args.run_id, rerun=args.rerun
@@ -213,7 +215,7 @@ def dispatch(args: argparse.Namespace) -> int:
         runner = build_runners(stub=False)[provider.runner]
         digest = (
             verify_digest(experiment.container_image, experiment.container_digest)
-            if provider.runner == "pi-container"
+            if runner.needs_image
             else None
         )
         import tempfile

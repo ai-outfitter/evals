@@ -158,7 +158,7 @@ def run_judges(
         judge_dir = paths.judgments / judge.id
         agent_dir = judge_dir / "pi-agent"
         agent_dir.mkdir(parents=True, exist_ok=True)
-        in_container = not isinstance(runner, StubAgentRunner)
+        in_container = runner.renders_container_urls
         (agent_dir / "models.json").write_text(
             json.dumps(experiment.registry.pi_models_json(in_container=in_container), indent=2)
             + "\n",

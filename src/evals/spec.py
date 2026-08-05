@@ -38,6 +38,20 @@ def validate_against(schema: JsonDict, document: Any, label: str) -> None:
         raise SpecError(f"{label}: {path}: {first.message}")
 
 
+def contained(path: Path, repo_root: Path, label: str) -> Path:
+    """Resolve a spec-referenced path and refuse anything outside the repo.
+
+    Task content is untrusted (AGENTS.md), and specs are read during plain
+    `validate` and `judge` runs, so a spec must not be able to name an
+    arbitrary host path and have the harness read it.
+    """
+    resolved = path.resolve()
+    root = repo_root.resolve()
+    if not resolved.is_relative_to(root):
+        raise SpecError(f"{label} points outside the repository: {resolved}")
+    return resolved
+
+
 def load_yaml_file(path: Path, label: str) -> JsonDict:
     if not path.is_file():
         raise SpecError(f"{label} not found: {path}")
@@ -230,7 +244,9 @@ def load_task(path: Path, repo_root: Path) -> Task:
         value = document.get(name)
         if value is None:
             return None
-        resolved = (path.parent / str(value)).resolve()
+        resolved = contained(
+            path.parent / str(value), repo_root, f"task {document['id']} {name}"
+        )
         if not resolved.exists():
             raise SpecError(f"task {document['id']} {name} does not exist: {resolved}")
         return resolved
@@ -248,7 +264,7 @@ def load_task(path: Path, repo_root: Path) -> Task:
     )
 
 
-def load_rubric(path: Path) -> Rubric:
+def load_rubric(path: Path, repo_root: Path) -> Rubric:
     document = load_yaml_file(path, "judge rubric")
     metrics = document.get("metrics")
     if not isinstance(metrics, list) or not metrics:
@@ -267,13 +283,16 @@ def load_rubric(path: Path) -> Rubric:
 def load_experiment(path: Path) -> Experiment:
     path = path.resolve()
     repo_root = find_repo_root(path.parent)
+    contained(path, repo_root, "experiment")
     document = load_yaml_file(path, "experiment spec")
     validate_against(
         load_schema(repo_root, "experiment.schema.json"), document, f"experiment {path}"
     )
 
-    registry = load_provider_registry((path.parent / str(document["providers"])).resolve())
-    task = load_task((path.parent / str(document["task"])).resolve(), repo_root)
+    registry = load_provider_registry(
+        contained(path.parent / str(document["providers"]), repo_root, "providers")
+    )
+    task = load_task(contained(path.parent / str(document["task"]), repo_root, "task"), repo_root)
 
     if task.kind.startswith("worktree") and task.fixture is None:
         raise SpecError(f"task {task.id}: worktree kinds require a fixture")
@@ -287,7 +306,12 @@ def load_experiment(path: Path) -> Experiment:
                 id=str(raw["id"]),
                 model_ref=str(raw["model"]),
                 thinking=str(raw.get("thinking", "off")),
-                rubric=load_rubric((path.parent / str(raw["rubric"])).resolve()),
+                rubric=load_rubric(
+                    contained(
+                        path.parent / str(raw["rubric"]), repo_root, f"judge {raw['id']} rubric"
+                    ),
+                    repo_root,
+                ),
             )
         )
 
