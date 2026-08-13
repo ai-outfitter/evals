@@ -1,0 +1,10 @@
+schema_version: 2
+id: transform-echo
+kind: transform-judge
+input: input/sample.txt
+prompt: |
+  Summarize the input below in one sentence. Do not add facts that are not
+  present in it.
+metrics:
+  - accuracy
+untrusted: true

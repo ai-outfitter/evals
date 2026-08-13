@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-outfitter.dev/schemas/evals-experiment/v2",
+  "title": "Evals experiment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "question", "independent_variables", "container", "providers", "matrix", "task", "judges", "judging", "human", "provenance"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+    "question": {"type": "string", "minLength": 1},
+    "independent_variables": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"enum": ["model", "thinking", "agent"]}
+    },
+    "container": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image"],
+      "properties": {
+        "image": {"type": "string", "minLength": 1},
+        "digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "providers": {"type": "string", "description": "Relative path to the provider registry (models.yaml)"},
+    "matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "thinking", "agent"],
+      "properties": {
+        "model": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[^/]+/.+$"}},
+        "thinking": {"type": "array", "minItems": 1, "items": {"enum": ["off", "minimal", "low", "medium", "high"]}},
+        "agent": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "repetitions": {"type": "integer", "minimum": 1, "default": 1}
+      }
+    },
+    "task": {"type": "string", "description": "Relative path to task.yaml"},
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cell_timeout_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "per_model_overrides": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {"cell_timeout_seconds": {"type": "number", "exclusiveMinimum": 0}}
+          }
+        }
+      }
+    },
+    "judges": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "model", "rubric"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+          "model": {"type": "string", "pattern": "^[^/]+/.+$"},
+          "thinking": {"enum": ["off", "minimal", "low", "medium", "high"]},
+          "rubric": {"type": "string"}
+        }
+      }
+    },
+    "judging": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "blinding", "inputs"],
+      "properties": {
+        "mode": {"const": "pairwise"},
+        "blinding": {"const": "randomized-ab"},
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"enum": ["diff", "final_message", "output", "evaluator_summary"]}
+        }
+      }
+    },
+    "human": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "metrics"],
+      "properties": {
+        "mode": {"const": "pairwise"},
+        "metrics": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["require_image_digest"],
+      "properties": {
+        "require_image_digest": {"type": "boolean"},
+        "bundle": {"const": "reproducible-tar"}
+      }
+    }
+  }
+}

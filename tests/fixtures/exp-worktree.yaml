@@ -1,0 +1,42 @@
+schema_version: 2
+id: exp-test-worktree
+question: >
+  Harness test fixture. Exercises the worktree path and the deterministic
+  evaluator against the frozen infrastructure fixture. Not a real experiment.
+independent_variables: [model, thinking]
+
+container:
+  image: localhost/evals-agent
+  digest: null
+
+providers: ../../models.yaml
+
+matrix:
+  model: ["ollama/qwen3:4b", "ollama/nemotron-3-nano:4b"]
+  thinking: [off, low, high]
+  agent: [implementer]
+  repetitions: 1
+
+task: ../../tasks/infra-fixture-001/task.yaml
+
+limits:
+  cell_timeout_seconds: 300
+
+judges:
+  - id: judge-a
+    model: "ollama/qwen3:4b"
+    thinking: off
+    rubric: rubric.yaml
+
+judging:
+  mode: pairwise
+  blinding: randomized-ab
+  inputs: [diff, final_message, evaluator_summary]
+
+human:
+  mode: pairwise
+  metrics: [accuracy, brevity]
+
+provenance:
+  require_image_digest: false
+  bundle: reproducible-tar

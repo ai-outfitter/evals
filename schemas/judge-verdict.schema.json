@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-outfitter.dev/schemas/evals-judge-verdict/v2",
+  "title": "Evals judge verdict",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "type", "judge", "comparison", "metrics", "overall_preference", "recorded_at"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "type": {"const": "judge_verdict"},
+    "judge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "model", "rubric_version"],
+      "properties": {
+        "id": {"type": "string"},
+        "model": {"type": "string"},
+        "thinking": {"type": "string"},
+        "rubric_version": {"type": "string"}
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "right", "blinding_seed", "presented_order"],
+      "properties": {
+        "left": {"type": "string", "description": "cell_id presented under its blinded label"},
+        "right": {"type": "string"},
+        "blinding_seed": {"type": "integer"},
+        "presented_order": {
+          "type": "array",
+          "items": {"enum": ["left", "right"]},
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"enum": ["left", "right", "tie"]}
+    },
+    "overall_preference": {"enum": ["left", "right", "tie"]},
+    "rationale": {"type": ["string", "null"]},
+    "raw_output_ref": {"type": ["string", "null"]},
+    "invalid": {"type": "boolean", "description": "True when the judge failed to produce a valid verdict"},
+    "recorded_at": {"type": "string"}
+  }
+}
