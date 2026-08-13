@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 85402872602948,
+    "left": "transcript-summary-claude-cli-haiku-off-summarizer-r1",
+    "presented_order": [
+      "left",
+      "right"
+    ],
+    "right": "transcript-summary-claude-cli-haiku-high-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-qwen4b",
+    "model": "ollama/qwen3:4b",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "tie",
+    "coverage": "tie",
+    "fidelity": "tie"
+  },
+  "overall_preference": "tie",
+  "rationale": "Both responses accurately reflect the transcript without adding claims (fidelity), capture all distinct claims without omission (coverage), and present concise prose without filler or disfluencies (concision). Key differences in phrasing and minor example details (e.g., 'agents.md' interpretation) are valid inferences from the transcript and do not constitute hallucinations or omissions.",
+  "raw_output_ref": "judgments/judge-qwen4b/transcript-summary-claude-cli-haiku-off-summarizer-r1__transcript-summary-claude-cli-haiku-high-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:32:53Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

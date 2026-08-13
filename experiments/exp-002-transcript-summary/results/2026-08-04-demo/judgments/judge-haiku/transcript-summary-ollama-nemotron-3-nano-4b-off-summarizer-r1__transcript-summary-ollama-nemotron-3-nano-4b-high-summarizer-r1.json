@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 280316335931951,
+    "left": "transcript-summary-ollama-nemotron-3-nano-4b-off-summarizer-r1",
+    "presented_order": [
+      "right",
+      "left"
+    ],
+    "right": "transcript-summary-ollama-nemotron-3-nano-4b-high-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-haiku",
+    "model": "claude-cli/haiku",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "right",
+    "coverage": "left",
+    "fidelity": "right"
+  },
+  "overall_preference": "right",
+  "rationale": "Response A maintains perfect fidelity to the transcript with all claims clearly supported, while Response B introduces interpretive elements not explicitly present in the source material. Specifically, B's summary includes 'not merely as UI \"outfitters\"'\u2014an inference about what Outfitter means that the transcript doesn't explicitly address\u2014and key point #6 ('developers risk writing generic blobs') interprets the 'amorphous blob' concept beyond what's stated. Response B does offer superior coverage of the philosophical underpinnings ('design for humans first,' human-agent alignment), which A glosses over, making it more comprehensive in capturing the speaker's intent. However, Response A achieves this coverage adequately while maintaining tighter prose: A's key points are concise and direct, whereas B uses more elaborate phrasing ('The speaker proposes,' 'simple entity,' additional contextual framing). Given the explicit instruction to penalize hallucinations more heavily than missing claims, A's conservative precision combined with appropriate coverage and superior concision yields the stronger overall result, though B's richer treatment of motivation and philosophy represents a meaningful tradeoff in a close decision.",
+  "raw_output_ref": "judgments/judge-haiku/transcript-summary-ollama-nemotron-3-nano-4b-off-summarizer-r1__transcript-summary-ollama-nemotron-3-nano-4b-high-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:45:31Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

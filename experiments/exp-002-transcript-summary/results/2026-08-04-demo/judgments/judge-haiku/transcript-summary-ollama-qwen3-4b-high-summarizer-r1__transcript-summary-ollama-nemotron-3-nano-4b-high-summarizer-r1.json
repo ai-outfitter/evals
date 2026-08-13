@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 87736535492408,
+    "left": "transcript-summary-ollama-qwen3-4b-high-summarizer-r1",
+    "presented_order": [
+      "left",
+      "right"
+    ],
+    "right": "transcript-summary-ollama-nemotron-3-nano-4b-high-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-haiku",
+    "model": "claude-cli/haiku",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "right",
+    "coverage": "left",
+    "fidelity": "tie"
+  },
+  "overall_preference": "left",
+  "rationale": "Both responses accurately represent the transcript without hallucinating claims. Response A provides superior coverage by capturing the lean startup derivation, the design-for-humans-first philosophy, the technical differentiation use case (engineer vs. finance), and the 'amorphous blob' concept\u2014all explicitly stated in the source. Response B is more concise, distilling the core concepts into tighter prose, but omits the conceptual foundations and philosophical context that the speaker emphasizes. While B achieves better concision, A's additional words serve coverage, not filler; the prose remains clean and well-structured. Given that the instructions prioritize accuracy and the task requires representing 'distinct claims' from the transcript, A's more complete capture of the source material outweighs B's marginal advantage in tightness.",
+  "raw_output_ref": "judgments/judge-haiku/transcript-summary-ollama-qwen3-4b-high-summarizer-r1__transcript-summary-ollama-nemotron-3-nano-4b-high-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:43:40Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

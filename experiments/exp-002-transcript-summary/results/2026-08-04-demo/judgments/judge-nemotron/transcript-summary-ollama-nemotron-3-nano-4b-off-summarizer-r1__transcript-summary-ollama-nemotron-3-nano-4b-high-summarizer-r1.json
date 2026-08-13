@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 71404621487480,
+    "left": "transcript-summary-ollama-nemotron-3-nano-4b-off-summarizer-r1",
+    "presented_order": [
+      "left",
+      "right"
+    ],
+    "right": "transcript-summary-ollama-nemotron-3-nano-4b-high-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-nemotron",
+    "model": "ollama/nemotron-3-nano:4b",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "tie",
+    "coverage": "tie",
+    "fidelity": "tie"
+  },
+  "overall_preference": "tie",
+  "rationale": "Both responses faithfully capture the transcript's claims about A_ I Outfitter personas functioning as project\u2011steering documents, describing role, biography, organization, quick review capability, human\u2011first philosophy, and avoiding generic blobs; they present these points in comparable concise prose without filler or hallucinated information. Hence each metric is a tie, resulting in an overall tie verdict.",
+  "raw_output_ref": "judgments/judge-nemotron/transcript-summary-ollama-nemotron-3-nano-4b-off-summarizer-r1__transcript-summary-ollama-nemotron-3-nano-4b-high-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:35:01Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

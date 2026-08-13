@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 198548012359659,
+    "left": "transcript-summary-ollama-qwen3-32b-off-summarizer-r1",
+    "presented_order": [
+      "right",
+      "left"
+    ],
+    "right": "transcript-summary-ollama-nemotron-3-nano-4b-off-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-qwen4b",
+    "model": "ollama/qwen3:4b",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "right",
+    "coverage": "right",
+    "fidelity": "right"
+  },
+  "overall_preference": "right",
+  "rationale": "Response A maintains precise fidelity with the transcript's exact term 'A_I_ Outfitter' and explicitly covers the critical 'amorphous blob' risk mentioned in the original speech. Response B's summary uses 'AI' (a hallucination as the transcript specifies 'A_I_') and omits the specific risk of generic blobs, resulting in lower coverage. Both responses are concise, but A's adherence to the source transcript's claims exceeds B.",
+  "raw_output_ref": "judgments/judge-qwen4b/transcript-summary-ollama-qwen3-32b-off-summarizer-r1__transcript-summary-ollama-nemotron-3-nano-4b-off-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:19:01Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

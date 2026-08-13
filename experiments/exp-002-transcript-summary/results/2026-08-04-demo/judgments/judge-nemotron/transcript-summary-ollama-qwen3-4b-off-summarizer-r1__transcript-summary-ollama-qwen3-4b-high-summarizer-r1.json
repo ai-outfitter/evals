@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 102376112228341,
+    "left": "transcript-summary-ollama-qwen3-4b-off-summarizer-r1",
+    "presented_order": [
+      "right",
+      "left"
+    ],
+    "right": "transcript-summary-ollama-qwen3-4b-high-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-nemotron",
+    "model": "ollama/nemotron-3-nano:4b",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "right",
+    "coverage": "tie",
+    "fidelity": "left"
+  },
+  "overall_preference": "right",
+  "rationale": "Response B excels in factual fidelity, accurately representing all transcript claims with no hallucinations and avoiding unnecessary wording. Response A includes a minor typographical error ('project seating' vs the correct 'steering'), slightly lowering its precision score but maintains full coverage of distinct points while being more concise. Overall verdict favors A due to its superior concision offsetting its slight fidelity deficit.",
+  "raw_output_ref": "judgments/judge-nemotron/transcript-summary-ollama-qwen3-4b-off-summarizer-r1__transcript-summary-ollama-qwen3-4b-high-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:34:14Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}
