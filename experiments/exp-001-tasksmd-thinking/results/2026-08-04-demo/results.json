@@ -1,0 +1,220 @@
+{
+  "cells": {
+    "tasksmd-calculator-ollama-nemotron-3-nano-4b-high-worktree-implementer-r1": {
+      "failure_class": "benchmark",
+      "scores": {
+        "tasks_completed": {
+          "max": 5,
+          "value": 0
+        },
+        "tests_pass": {
+          "max": 1,
+          "value": 0
+        }
+      },
+      "status": "fail"
+    },
+    "tasksmd-calculator-ollama-nemotron-3-nano-4b-low-worktree-implementer-r1": {
+      "failure_class": "benchmark",
+      "scores": {
+        "tasks_completed": {
+          "max": 5,
+          "value": 0
+        },
+        "tests_pass": {
+          "max": 1,
+          "value": 0
+        }
+      },
+      "status": "fail"
+    },
+    "tasksmd-calculator-ollama-nemotron-3-nano-4b-off-worktree-implementer-r1": {
+      "failure_class": "benchmark",
+      "scores": {
+        "tasks_completed": {
+          "max": 5,
+          "value": 0
+        },
+        "tests_pass": {
+          "max": 1,
+          "value": 0
+        }
+      },
+      "status": "fail"
+    },
+    "tasksmd-calculator-ollama-qwen3-4b-high-worktree-implementer-r1": {
+      "failure_class": "agent_execution",
+      "scores": {
+        "tasks_completed": {
+          "max": 5,
+          "value": 0
+        },
+        "tests_pass": {
+          "max": 1,
+          "value": 0
+        }
+      },
+      "status": "invalid"
+    },
+    "tasksmd-calculator-ollama-qwen3-4b-low-worktree-implementer-r1": {
+      "failure_class": "agent_execution",
+      "scores": {
+        "tasks_completed": {
+          "max": 5,
+          "value": 0
+        },
+        "tests_pass": {
+          "max": 1,
+          "value": 0
+        }
+      },
+      "status": "invalid"
+    },
+    "tasksmd-calculator-ollama-qwen3-4b-off-worktree-implementer-r1": {
+      "failure_class": "benchmark",
+      "scores": {
+        "tasks_completed": {
+          "max": 5,
+          "value": 0
+        },
+        "tests_pass": {
+          "max": 1,
+          "value": 0
+        }
+      },
+      "status": "fail"
+    }
+  },
+  "experiment_id": "exp-001-tasksmd-thinking",
+  "human_preferences": 0,
+  "human_wins": {},
+  "judge_agreement": {
+    "judge-nemotron": {
+      "agreement": null,
+      "matching": 0,
+      "shared": 0
+    },
+    "judge-qwen4b": {
+      "agreement": null,
+      "matching": 0,
+      "shared": 0
+    }
+  },
+  "judge_verdicts": 8,
+  "judge_wins": {
+    "model": {
+      "ollama/nemotron-3-nano:4b": {
+        "diff_quality": {
+          "loss": 0,
+          "tie": 2,
+          "win": 0
+        },
+        "instruction_adherence": {
+          "loss": 0,
+          "tie": 2,
+          "win": 0
+        },
+        "overall": {
+          "loss": 0,
+          "tie": 2,
+          "win": 0
+        },
+        "task_completion": {
+          "loss": 0,
+          "tie": 2,
+          "win": 0
+        }
+      },
+      "ollama/qwen3:4b": {
+        "diff_quality": {
+          "loss": 0,
+          "tie": 2,
+          "win": 0
+        },
+        "instruction_adherence": {
+          "loss": 0,
+          "tie": 2,
+          "win": 0
+        },
+        "overall": {
+          "loss": 0,
+          "tie": 2,
+          "win": 0
+        },
+        "task_completion": {
+          "loss": 0,
+          "tie": 2,
+          "win": 0
+        }
+      }
+    },
+    "thinking": {
+      "high": {
+        "diff_quality": {
+          "loss": 0,
+          "tie": 4,
+          "win": 0
+        },
+        "instruction_adherence": {
+          "loss": 0,
+          "tie": 4,
+          "win": 0
+        },
+        "overall": {
+          "loss": 0,
+          "tie": 4,
+          "win": 0
+        },
+        "task_completion": {
+          "loss": 0,
+          "tie": 4,
+          "win": 0
+        }
+      },
+      "low": {
+        "diff_quality": {
+          "loss": 0,
+          "tie": 4,
+          "win": 0
+        },
+        "instruction_adherence": {
+          "loss": 0,
+          "tie": 4,
+          "win": 0
+        },
+        "overall": {
+          "loss": 0,
+          "tie": 4,
+          "win": 0
+        },
+        "task_completion": {
+          "loss": 0,
+          "tie": 4,
+          "win": 0
+        }
+      },
+      "off": {
+        "diff_quality": {
+          "loss": 0,
+          "tie": 4,
+          "win": 0
+        },
+        "instruction_adherence": {
+          "loss": 0,
+          "tie": 4,
+          "win": 0
+        },
+        "overall": {
+          "loss": 0,
+          "tie": 4,
+          "win": 0
+        },
+        "task_completion": {
+          "loss": 0,
+          "tie": 4,
+          "win": 0
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,60 @@
+schema_version: 2
+id: exp-001-tasksmd-thinking
+question: >
+  On the TASKS.md calculator task, does raising the thinking level improve
+  outcomes for local models, and how do qwen3:32b, qwen3:4b, and
+  nemotron-3-nano:4b compare when everything else is held constant?
+independent_variables: [model, thinking]
+
+container:
+  image: localhost/evals-agent
+  digest: null
+
+providers: ../../models.yaml
+
+matrix:
+  model: ["ollama/qwen3:32b", "ollama/qwen3:4b", "ollama/nemotron-3-nano:4b", "claude-cli/haiku"]
+  thinking: [off, low, high]
+  agent: [worktree-implementer]
+  repetitions: 1
+
+task: ../../tasks/tasksmd-calculator/task.yaml
+
+limits:
+  cell_timeout_seconds: 2400
+  per_model_overrides:
+    "ollama/qwen3:4b":
+      cell_timeout_seconds: 480
+    "ollama/nemotron-3-nano:4b":
+      cell_timeout_seconds: 900
+    "claude-cli/haiku":
+      cell_timeout_seconds: 600
+
+judges:
+  - id: judge-qwen4b
+    model: "ollama/qwen3:4b"
+    thinking: off
+    rubric: ../../judges/tasksmd-rubric.yaml
+  - id: judge-nemotron
+    model: "ollama/nemotron-3-nano:4b"
+    thinking: off
+    rubric: ../../judges/tasksmd-rubric.yaml
+  # Held-out judge: a different provider and vendor from every contestant
+  # except the haiku cells, and the only judge not in the 4b weight class.
+  - id: judge-haiku
+    model: "claude-cli/haiku"
+    thinking: off
+    rubric: ../../judges/tasksmd-rubric.yaml
+
+judging:
+  mode: pairwise
+  blinding: randomized-ab
+  inputs: [diff, final_message, evaluator_summary]
+
+human:
+  mode: pairwise
+  metrics: [task_completion, diff_quality, instruction_adherence]
+
+provenance:
+  require_image_digest: false
+  bundle: reproducible-tar

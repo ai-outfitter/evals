@@ -1,0 +1,66 @@
+{
+  "artifacts": [
+    "output.md",
+    "pi-output.jsonl",
+    "pi-stderr.txt",
+    "request.json"
+  ],
+  "cell_id": "transcript-summary-claude-cli-haiku-off-summarizer-r1",
+  "container": {
+    "digest": null,
+    "image": "localhost/evals-agent",
+    "network": "host-direct",
+    "runtime": null
+  },
+  "execution": {
+    "agent_status": "success",
+    "exit_code": 0,
+    "infrastructure_error": null,
+    "session": {
+      "response_models": [
+        "claude-haiku-4-5-20251001"
+      ],
+      "stop_reason": "end_turn",
+      "usage": {
+        "cache_read": 0,
+        "cache_write": 8018,
+        "input": 9,
+        "output": 785,
+        "total_tokens": 794
+      },
+      "wall_clock_seconds": 9.849
+    }
+  },
+  "experiment": {
+    "id": "exp-002-transcript-summary",
+    "kind": "transform-judge",
+    "repetition": 1,
+    "task_id": "transcript-summary"
+  },
+  "outcome": {
+    "evaluator_exit_code": null,
+    "failure_class": "none",
+    "scores": {},
+    "status": "unscored"
+  },
+  "run": {
+    "collected_at": "2026-08-04T16:05:11Z",
+    "origin": "local",
+    "repository": null,
+    "run_attempt": "1",
+    "run_id": "demo",
+    "source_sha": "2d2312c38bef3dce4e6a625cb8e723dede7d20ad"
+  },
+  "schema_version": 2,
+  "spec_hash": "sha256:6183642a7e54fe330c5eb25e629461de91372f92b9f5c9945048d8e16b94261d",
+  "variant": {
+    "agent": "summarizer",
+    "harness": "claude-cli",
+    "outfitter_version": null,
+    "pi_version": "0.80.10",
+    "provider": "claude-cli",
+    "requested_model": "haiku",
+    "thinking": "off",
+    "tools": []
+  }
+}

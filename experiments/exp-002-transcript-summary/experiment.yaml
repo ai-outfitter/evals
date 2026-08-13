@@ -1,0 +1,53 @@
+schema_version: 2
+id: exp-002-transcript-summary
+question: >
+  Which model produces the best structured summary of a raw voice-memo
+  transcript, does thinking level change summary quality, and how far behind
+  a hosted baseline (Claude Haiku) are the local models?
+independent_variables: [model, thinking]
+
+container:
+  image: localhost/evals-agent
+  digest: null
+
+providers: ../../models.yaml
+
+matrix:
+  model: ["ollama/qwen3:32b", "ollama/qwen3:4b", "ollama/nemotron-3-nano:4b", "claude-cli/haiku"]
+  thinking: [off, high]
+  agent: [summarizer]
+  repetitions: 1
+
+task: ../../tasks/transcript-summary/task.yaml
+
+limits:
+  cell_timeout_seconds: 900
+
+judges:
+  - id: judge-qwen4b
+    model: "ollama/qwen3:4b"
+    thinking: off
+    rubric: ../../judges/summary-rubric.yaml
+  - id: judge-nemotron
+    model: "ollama/nemotron-3-nano:4b"
+    thinking: off
+    rubric: ../../judges/summary-rubric.yaml
+  # Held-out judge: a different provider and vendor from every contestant
+  # except the haiku cells, and the only judge not in the 4b weight class.
+  - id: judge-haiku
+    model: "claude-cli/haiku"
+    thinking: off
+    rubric: ../../judges/summary-rubric.yaml
+
+judging:
+  mode: pairwise
+  blinding: randomized-ab
+  inputs: [output]
+
+human:
+  mode: pairwise
+  metrics: [fidelity, coverage, concision]
+
+provenance:
+  require_image_digest: false
+  bundle: reproducible-tar

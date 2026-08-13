@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 104932655195651,
+    "left": "transcript-summary-ollama-qwen3-4b-off-summarizer-r1",
+    "presented_order": [
+      "right",
+      "left"
+    ],
+    "right": "transcript-summary-ollama-nemotron-3-nano-4b-off-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-nemotron",
+    "model": "ollama/nemotron-3-nano:4b",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "tie",
+    "coverage": "tie",
+    "fidelity": "tie"
+  },
+  "overall_preference": "tie",
+  "rationale": "Both responses faithfully reproduce the transcript with no invented claims and fully cover its points, presenting information in clear prose without unnecessary filler. Each section (Summary, Key points, Decisions) accurately reflects the original speaker\u2019s ideas about project-steering personas linking roles, organisations, human-first design, and avoiding generic outputs.",
+  "raw_output_ref": "judgments/judge-nemotron/transcript-summary-ollama-qwen3-4b-off-summarizer-r1__transcript-summary-ollama-nemotron-3-nano-4b-off-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:34:22Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

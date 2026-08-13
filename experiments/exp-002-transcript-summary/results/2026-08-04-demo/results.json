@@ -1,0 +1,203 @@
+{
+  "cells": {
+    "transcript-summary-claude-cli-haiku-high-summarizer-r1": {
+      "failure_class": "none",
+      "scores": {},
+      "status": "unscored"
+    },
+    "transcript-summary-claude-cli-haiku-off-summarizer-r1": {
+      "failure_class": "none",
+      "scores": {},
+      "status": "unscored"
+    },
+    "transcript-summary-ollama-nemotron-3-nano-4b-high-summarizer-r1": {
+      "failure_class": "none",
+      "scores": {},
+      "status": "unscored"
+    },
+    "transcript-summary-ollama-nemotron-3-nano-4b-off-summarizer-r1": {
+      "failure_class": "none",
+      "scores": {},
+      "status": "unscored"
+    },
+    "transcript-summary-ollama-qwen3-32b-high-summarizer-r1": {
+      "failure_class": "none",
+      "scores": {},
+      "status": "unscored"
+    },
+    "transcript-summary-ollama-qwen3-32b-off-summarizer-r1": {
+      "failure_class": "none",
+      "scores": {},
+      "status": "unscored"
+    },
+    "transcript-summary-ollama-qwen3-4b-high-summarizer-r1": {
+      "failure_class": "none",
+      "scores": {},
+      "status": "unscored"
+    },
+    "transcript-summary-ollama-qwen3-4b-off-summarizer-r1": {
+      "failure_class": "none",
+      "scores": {},
+      "status": "unscored"
+    }
+  },
+  "experiment_id": "exp-002-transcript-summary",
+  "human_preferences": 0,
+  "human_wins": {},
+  "judge_agreement": {
+    "judge-haiku": {
+      "agreement": null,
+      "matching": 0,
+      "shared": 0
+    },
+    "judge-nemotron": {
+      "agreement": null,
+      "matching": 0,
+      "shared": 0
+    },
+    "judge-qwen4b": {
+      "agreement": null,
+      "matching": 0,
+      "shared": 0
+    }
+  },
+  "judge_verdicts": 45,
+  "judge_wins": {
+    "model": {
+      "claude-cli/haiku": {
+        "concision": {
+          "loss": 6,
+          "tie": 4,
+          "win": 6
+        },
+        "coverage": {
+          "loss": 0,
+          "tie": 4,
+          "win": 12
+        },
+        "fidelity": {
+          "loss": 3,
+          "tie": 11,
+          "win": 2
+        },
+        "overall": {
+          "loss": 1,
+          "tie": 7,
+          "win": 8
+        }
+      },
+      "ollama/nemotron-3-nano:4b": {
+        "concision": {
+          "loss": 5,
+          "tie": 5,
+          "win": 7
+        },
+        "coverage": {
+          "loss": 10,
+          "tie": 4,
+          "win": 3
+        },
+        "fidelity": {
+          "loss": 6,
+          "tie": 9,
+          "win": 2
+        },
+        "overall": {
+          "loss": 11,
+          "tie": 5,
+          "win": 1
+        }
+      },
+      "ollama/qwen3:32b": {
+        "concision": {
+          "loss": 9,
+          "tie": 4,
+          "win": 3
+        },
+        "coverage": {
+          "loss": 5,
+          "tie": 6,
+          "win": 5
+        },
+        "fidelity": {
+          "loss": 4,
+          "tie": 8,
+          "win": 4
+        },
+        "overall": {
+          "loss": 7,
+          "tie": 4,
+          "win": 5
+        }
+      },
+      "ollama/qwen3:4b": {
+        "concision": {
+          "loss": 5,
+          "tie": 3,
+          "win": 9
+        },
+        "coverage": {
+          "loss": 8,
+          "tie": 6,
+          "win": 3
+        },
+        "fidelity": {
+          "loss": 1,
+          "tie": 10,
+          "win": 6
+        },
+        "overall": {
+          "loss": 4,
+          "tie": 4,
+          "win": 9
+        }
+      }
+    },
+    "thinking": {
+      "high": {
+        "concision": {
+          "loss": 1,
+          "tie": 6,
+          "win": 5
+        },
+        "coverage": {
+          "loss": 3,
+          "tie": 7,
+          "win": 2
+        },
+        "fidelity": {
+          "loss": 4,
+          "tie": 5,
+          "win": 3
+        },
+        "overall": {
+          "loss": 4,
+          "tie": 3,
+          "win": 5
+        }
+      },
+      "off": {
+        "concision": {
+          "loss": 5,
+          "tie": 6,
+          "win": 1
+        },
+        "coverage": {
+          "loss": 2,
+          "tie": 7,
+          "win": 3
+        },
+        "fidelity": {
+          "loss": 3,
+          "tie": 5,
+          "win": 4
+        },
+        "overall": {
+          "loss": 5,
+          "tie": 3,
+          "win": 4
+        }
+      }
+    }
+  }
+}

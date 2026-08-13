@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 280227005284438,
+    "left": "transcript-summary-ollama-qwen3-32b-off-summarizer-r1",
+    "presented_order": [
+      "left",
+      "right"
+    ],
+    "right": "transcript-summary-ollama-qwen3-32b-high-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-haiku",
+    "model": "claude-cli/haiku",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "right",
+    "coverage": "left",
+    "fidelity": "right"
+  },
+  "overall_preference": "right",
+  "rationale": "Response A provides more explicit coverage of key concepts\u2014particularly the flexibility to mix-and-match personas and test varied perspectives, plus clear integration across the project lifecycle. However, it contains a factual error: it states the company as \"ACME\" when the transcript specifies \"ACMICO.\" Response B maintains accuracy on all details, including the correct company name, and delivers notably more concise prose (summary ~30% shorter) without sacrificing essential concepts. Both responses adequately cover the core narrative: personas as lean-inspired project steering documents that clarify audience and technical tone while centering human-first design. Response B's advantages in fidelity and concision, combined with A's only moderate coverage edge, favor Response B as the stronger summary.",
+  "raw_output_ref": "judgments/judge-haiku/transcript-summary-ollama-qwen3-32b-off-summarizer-r1__transcript-summary-ollama-qwen3-32b-high-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:36:27Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

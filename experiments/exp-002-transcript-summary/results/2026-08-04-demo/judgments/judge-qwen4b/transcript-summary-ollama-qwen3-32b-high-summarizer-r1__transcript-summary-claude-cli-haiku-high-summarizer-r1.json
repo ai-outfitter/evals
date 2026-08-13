@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 166918883183262,
+    "left": "transcript-summary-ollama-qwen3-32b-high-summarizer-r1",
+    "presented_order": [
+      "left",
+      "right"
+    ],
+    "right": "transcript-summary-claude-cli-haiku-high-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-qwen4b",
+    "model": "ollama/qwen3:4b",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "right",
+    "coverage": "right",
+    "fidelity": "left"
+  },
+  "overall_preference": "left",
+  "rationale": "Response B hallucinates the company name 'ACME' instead of 'ACMICO' from the transcript, violating fidelity. Coverage and concision are better for B, but fidelity is penalized more heavily as per instructions.",
+  "raw_output_ref": "judgments/judge-qwen4b/transcript-summary-ollama-qwen3-32b-high-summarizer-r1__transcript-summary-claude-cli-haiku-high-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:21:55Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

@@ -1,0 +1,29 @@
+{
+  "comparison": {
+    "blinding_seed": 59220703124396,
+    "left": "transcript-summary-ollama-qwen3-32b-high-summarizer-r1",
+    "presented_order": [
+      "left",
+      "right"
+    ],
+    "right": "transcript-summary-ollama-nemotron-3-nano-4b-high-summarizer-r1"
+  },
+  "invalid": false,
+  "judge": {
+    "id": "judge-qwen4b",
+    "model": "ollama/qwen3:4b",
+    "rubric_version": "1",
+    "thinking": "off"
+  },
+  "metrics": {
+    "concision": "right",
+    "coverage": "left",
+    "fidelity": "left"
+  },
+  "overall_preference": "left",
+  "rationale": "Response B hallucinates 'team review' (transcript specifies individual usage) and omits critical coverage points about 'engineers vs finance personnel' and 'amorphous blobs' while Response A maintains full fidelity with no invented claims. Response B is more concise but loses key contextual details that impact coverage.",
+  "raw_output_ref": "judgments/judge-qwen4b/transcript-summary-ollama-qwen3-32b-high-summarizer-r1__transcript-summary-ollama-nemotron-3-nano-4b-high-summarizer-r1.artifacts",
+  "recorded_at": "2026-08-04T16:20:53Z",
+  "schema_version": 2,
+  "type": "judge_verdict"
+}

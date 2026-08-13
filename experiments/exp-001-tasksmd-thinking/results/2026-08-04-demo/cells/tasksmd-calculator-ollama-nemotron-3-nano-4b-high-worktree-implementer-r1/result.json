@@ -1,0 +1,78 @@
+{
+  "artifacts": [
+    "evaluator.json",
+    "evaluator.log",
+    "output.md",
+    "patch.diff",
+    "pi-output.jsonl",
+    "pi-stderr.txt",
+    "request.json"
+  ],
+  "cell_id": "tasksmd-calculator-ollama-nemotron-3-nano-4b-high-worktree-implementer-r1",
+  "container": {
+    "digest": "sha256:a6738ae527b296a39c93a67748c3d530cbec02f8517d1d0f8774f423be7abc73",
+    "image": "localhost/evals-agent",
+    "network": "host",
+    "runtime": "podman version 5.8.4"
+  },
+  "execution": {
+    "agent_status": "success",
+    "exit_code": 0,
+    "infrastructure_error": null,
+    "session": {
+      "response_models": [],
+      "stop_reason": "stop",
+      "usage": {
+        "cache_read": 0,
+        "cache_write": 0,
+        "input": 2529,
+        "output": 1580,
+        "total_tokens": 4109
+      },
+      "wall_clock_seconds": 19.334
+    }
+  },
+  "experiment": {
+    "id": "exp-001-tasksmd-thinking",
+    "kind": "worktree-tasksmd",
+    "repetition": 1,
+    "task_id": "tasksmd-calculator"
+  },
+  "outcome": {
+    "evaluator_exit_code": 0,
+    "failure_class": "benchmark",
+    "scores": {
+      "tasks_completed": {
+        "max": 5,
+        "value": 0
+      },
+      "tests_pass": {
+        "max": 1,
+        "value": 0
+      }
+    },
+    "status": "fail"
+  },
+  "run": {
+    "collected_at": "2026-08-03T19:45:45Z",
+    "origin": "local",
+    "repository": null,
+    "run_attempt": "1",
+    "run_id": "demo",
+    "source_sha": "ab4d77e480a2f46b026c2d8aaa977242a839ed1d"
+  },
+  "schema_version": 2,
+  "spec_hash": "sha256:8574fe92617e5b69a62d288dbc8ec552cdd7d463349b425b15d21145a561e09e",
+  "variant": {
+    "agent": "worktree-implementer",
+    "harness": "container-pi",
+    "outfitter_version": null,
+    "pi_version": "0.80.10",
+    "provider": "ollama",
+    "requested_model": "nemotron-3-nano:4b",
+    "thinking": "high",
+    "tools": [
+      "default"
+    ]
+  }
+}
