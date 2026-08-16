@@ -4,30 +4,32 @@ from __future__ import annotations
 
 import json
 import math
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from jsonschema.validators import validator_for
+from .pi import compile_schema, first_schema_error
 
 JsonDict = dict[str, Any]
+
+SCHEMAS_DIR = Path(__file__).resolve().parents[2] / "schemas"
+SCORE_PRECISION = 12
 
 
 class ClassifierError(RuntimeError):
     """Raised when a classifier result or hidden label is not valid."""
 
 
-def _schema_path(name: str) -> Path:
-    return Path(__file__).resolve().parents[2] / "schemas" / name
+@lru_cache(maxsize=None)
+def _validator(schema_name: str) -> Any:
+    schema = json.loads((SCHEMAS_DIR / schema_name).read_text(encoding="utf-8"))
+    return compile_schema(schema)
 
 
 def _validate(document: Any, schema_name: str, label: str) -> JsonDict:
-    schema = json.loads(_schema_path(schema_name).read_text(encoding="utf-8"))
-    validator = validator_for(schema)(schema)
-    errors = sorted(validator.iter_errors(document), key=lambda error: list(error.absolute_path))
-    if errors:
-        first = errors[0]
-        path = ".".join(str(part) for part in first.absolute_path) or "<root>"
-        raise ClassifierError(f"{label}: {path}: {first.message}")
+    detail = first_schema_error(_validator(schema_name), document)
+    if detail is not None:
+        raise ClassifierError(f"{label}: {detail}")
     assert isinstance(document, dict)
     return document
 
@@ -38,15 +40,18 @@ def validate_classifier_result(document: Any) -> JsonDict:
     if result["kind"] == "boolean" and not math.isfinite(float(result["confidence"])):
         raise ClassifierError("classifier result: confidence must be finite")
     if result["kind"] == "ranking":
-        identifiers = [item["id"] for item in result["items"]]
+        identifiers: list[str] = []
+        scores: list[float] = []
+        finite = True
+        for item in result["items"]:
+            identifiers.append(item["id"])
+            scores.append(item["score"])
+            finite = finite and all(
+                math.isfinite(float(item[field])) for field in ("score", "confidence")
+            )
         if len(identifiers) != len(set(identifiers)):
             raise ClassifierError("classifier result: ranking item ids must be unique")
-        scores = [item["score"] for item in result["items"]]
-        if any(
-            not math.isfinite(float(item[field]))
-            for item in result["items"]
-            for field in ("score", "confidence")
-        ):
+        if not finite:
             raise ClassifierError("classifier result: ranking scores and confidence must be finite")
         if any(left < right for left, right in zip(scores, scores[1:])):
             raise ClassifierError("classifier result: ranking scores must be in descending order")
@@ -63,8 +68,37 @@ def validate_classifier_expected(document: Any) -> JsonDict:
     return expected
 
 
-def _score(value: float, maximum: float = 1.0) -> JsonDict:
-    return {"value": round(float(value), 12), "max": float(maximum)}
+def round_score(value: float) -> float:
+    """Round to the one precision shared by per-cell and aggregate metrics."""
+    return round(float(value), SCORE_PRECISION)
+
+
+def score_entry(value: float) -> JsonDict:
+    return {"value": round_score(value), "max": 1.0}
+
+
+def precision_recall_f1(
+    true_positive: float, false_positive: float, false_negative: float
+) -> tuple[float, float, float]:
+    """Return precision, recall, and F1 for one confusion-matrix triple."""
+    predicted = true_positive + false_positive
+    actual = true_positive + false_negative
+    precision = true_positive / predicted if predicted else 0.0
+    recall = true_positive / actual if actual else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    return precision, recall, f1
+
+
+def invalid_summary(error: str) -> JsonDict:
+    """Return the scored-summary shape for a result that failed the contract."""
+    return {
+        "schema_version": 1,
+        "kind": "invalid",
+        "pass": False,
+        "k": None,
+        "scores": {"schema_validity": score_entry(0)},
+        "error": error,
+    }
 
 
 def _boolean_scores(result: JsonDict, expected: JsonDict) -> JsonDict:
@@ -77,23 +111,19 @@ def _boolean_scores(result: JsonDict, expected: JsonDict) -> JsonDict:
     false_positive = int(decision and not label)
     false_negative = int(not decision and label)
     true_negative = int(not decision and not label)
-    precision_denominator = true_positive + false_positive
-    recall_denominator = true_positive + false_negative
-    precision = true_positive / precision_denominator if precision_denominator else 0.0
-    recall = true_positive / recall_denominator if recall_denominator else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    precision, recall, f1 = precision_recall_f1(true_positive, false_positive, false_negative)
     brier = (positive_probability - float(label)) ** 2
     return {
-        "accuracy": _score(decision == label),
-        "precision": _score(precision),
-        "recall": _score(recall),
-        "f1": _score(f1),
-        "brier": _score(brier),
-        "true_positive": _score(true_positive),
-        "false_positive": _score(false_positive),
-        "false_negative": _score(false_negative),
-        "true_negative": _score(true_negative),
-        "schema_validity": _score(1),
+        "accuracy": score_entry(decision == label),
+        "precision": score_entry(precision),
+        "recall": score_entry(recall),
+        "f1": score_entry(f1),
+        "brier": score_entry(brier),
+        "true_positive": score_entry(true_positive),
+        "false_positive": score_entry(false_positive),
+        "false_negative": score_entry(false_negative),
+        "true_negative": score_entry(true_negative),
+        "schema_validity": score_entry(1),
     }
 
 
@@ -111,8 +141,8 @@ def _ranking_scores(result: JsonDict, expected: JsonDict, k: int) -> JsonDict:
     required = set(expected["required_ids"])
     ranked_ids = [item["id"] for item in result["items"]]
     top_ids = ranked_ids[:k]
-    hits = [identifier for identifier in top_ids if identifier in required]
-    recall = len(hits) / len(required) if required else 1.0
+    top_set = set(top_ids)
+    recall = len(required & top_set) / len(required) if required else 1.0
 
     first_rank = next(
         (index for index, identifier in enumerate(ranked_ids, start=1) if identifier in required),
@@ -144,15 +174,15 @@ def _ranking_scores(result: JsonDict, expected: JsonDict, k: int) -> JsonDict:
     soft = 0.50 * recall + 0.30 * ndcg + 0.20 * calibration
 
     scores = {
-        f"recall_at_{k}": _score(recall),
-        "reciprocal_rank": _score(reciprocal_rank),
-        f"ndcg_at_{k}": _score(ndcg),
-        "soft_score": _score(soft),
-        "required_top_k": _score(required.issubset(top_ids)),
-        "schema_validity": _score(1),
+        f"recall_at_{k}": score_entry(recall),
+        "reciprocal_rank": score_entry(reciprocal_rank),
+        f"ndcg_at_{k}": score_entry(ndcg),
+        "soft_score": score_entry(soft),
+        "required_top_k": score_entry(required.issubset(top_set)),
+        "schema_validity": score_entry(1),
     }
     if brier is not None:
-        scores["brier"] = _score(brier)
+        scores["brier"] = score_entry(brier)
     return scores
 
 
@@ -168,13 +198,12 @@ def score_classifier_result(result: Any, expected: Any, *, k: int = 20) -> JsonD
 
     kind = valid_result["kind"]
     if kind == "boolean":
-        passed = valid_result["decision"] == valid_expected["label"]
         scores = _boolean_scores(valid_result, valid_expected)
+        passed = bool(scores["accuracy"]["value"])
     else:
         k = _validate_k(k)
-        top_ids = {item["id"] for item in valid_result["items"][:k]}
-        passed = set(valid_expected["required_ids"]).issubset(top_ids)
         scores = _ranking_scores(valid_result, valid_expected, k)
+        passed = bool(scores["required_top_k"]["value"])
     return {
         "schema_version": 1,
         "kind": kind,
@@ -186,12 +215,15 @@ def score_classifier_result(result: Any, expected: Any, *, k: int = 20) -> JsonD
 
 def load_and_score(result_path: Path, expected_path: Path, *, k: int = 20) -> JsonDict:
     """Load and score one result and one hidden label file."""
+    return score_classifier_result(
+        _read_json(result_path, "classifier result"),
+        _read_json(expected_path, "classifier expected label"),
+        k=k,
+    )
+
+
+def _read_json(path: Path, label: str) -> Any:
     try:
-        result = json.loads(result_path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise ClassifierError(f"cannot read classifier result {result_path}: {error}") from error
-    try:
-        expected = json.loads(expected_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise ClassifierError(f"cannot read classifier expected label {expected_path}: {error}") from error
-    return score_classifier_result(result, expected, k=k)
+        raise ClassifierError(f"cannot read {label} {path}: {error}") from error

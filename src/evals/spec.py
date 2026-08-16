@@ -7,10 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from jsonschema.validators import validator_for
-
 from .classifier import ClassifierError, validate_classifier_expected
-from .pi import load_yaml
+from .pi import compile_schema, first_schema_error, load_yaml
 
 JsonDict = dict[str, Any]
 
@@ -31,12 +29,9 @@ def load_schema(repo_root: Path, name: str) -> JsonDict:
 
 
 def validate_against(schema: JsonDict, document: Any, label: str) -> None:
-    validator = validator_for(schema)(schema)
-    errors = sorted(validator.iter_errors(document), key=lambda e: list(e.absolute_path))
-    if errors:
-        first = errors[0]
-        path = ".".join(str(part) for part in first.absolute_path) or "<root>"
-        raise SpecError(f"{label}: {path}: {first.message}")
+    detail = first_schema_error(compile_schema(schema), document)
+    if detail is not None:
+        raise SpecError(f"{label}: {detail}")
 
 
 def contained(path: Path, repo_root: Path, label: str) -> Path:
@@ -314,9 +309,8 @@ def load_experiment(path: Path) -> Experiment:
         raise SpecError(f"task {task.id}: worktree kinds require a fixture")
     if task.kind.startswith("transform") and task.input is None:
         raise SpecError(f"task {task.id}: transform kinds require an input")
-    if task.kind == "transform-classifier" and task.expected is None:
-        raise SpecError(f"task {task.id}: transform-classifier requires an expected label")
     if task.kind == "transform-classifier":
+        # task.schema.json already requires `expected` for this kind.
         assert task.expected is not None
         try:
             expected = json.loads(task.expected.read_text(encoding="utf-8"))

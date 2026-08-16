@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .pi import slugify
@@ -39,7 +40,7 @@ class Cell:
 
 
 def spec_hash(experiment: Experiment, cell: Cell) -> str:
-    def file_digest(path: Any) -> str | None:
+    def file_digest(path: Path | None) -> str | None:
         if path is None:
             return None
         return hashlib.sha256(path.read_bytes()).hexdigest()

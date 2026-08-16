@@ -7,6 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from .classifier import precision_recall_f1, round_score
 from .spec import Experiment, RunPaths
 
 JsonDict = dict[str, Any]
@@ -118,65 +119,72 @@ def win_rate(counts: JsonDict) -> str:
     return f"{counts['win']}/{decided} ({counts['win'] / decided:.0%})"
 
 
+def metric(scores: JsonDict, name: str) -> float | None:
+    score = scores.get(name)
+    return float(score["value"]) if score is not None else None
+
+
 def classifier_metrics(results: dict[str, JsonDict]) -> JsonDict:
     """Aggregate deterministic classifier metrics across classifier cells."""
-    classifier_results = [
-        result
-        for result in results.values()
-        if result["experiment"]["kind"] == "transform-classifier"
-    ]
-    if not classifier_results:
+    total_cells = 0
+    valid_cells = 0
+    boolean: list[JsonDict] = []
+    ranking: list[JsonDict] = []
+    for result in results.values():
+        if result["experiment"]["kind"] != "transform-classifier":
+            continue
+        total_cells += 1
+        scores = result["outcome"]["scores"]
+        if metric(scores, "schema_validity") != 1.0:
+            continue
+        valid_cells += 1
+        if "accuracy" in scores:
+            boolean.append(scores)
+        if "reciprocal_rank" in scores:
+            ranking.append(scores)
+    if not total_cells:
         return {}
 
-    def value(result: JsonDict, name: str) -> float | None:
-        score = result["outcome"]["scores"].get(name)
-        return float(score["value"]) if score is not None else None
-
-    valid = [result for result in classifier_results if value(result, "schema_validity") == 1.0]
-    boolean = [result for result in valid if value(result, "accuracy") is not None]
-    ranking = [result for result in valid if value(result, "reciprocal_rank") is not None]
     summary: JsonDict = {
-        "total_cells": len(classifier_results),
-        "valid_cells": len(valid),
-        "schema_validity_rate": round(len(valid) / len(classifier_results), 12),
+        "total_cells": total_cells,
+        "valid_cells": valid_cells,
+        "schema_validity_rate": round_score(valid_cells / total_cells),
     }
 
     if boolean:
-        true_positive = sum(value(result, "true_positive") or 0.0 for result in boolean)
-        false_positive = sum(value(result, "false_positive") or 0.0 for result in boolean)
-        false_negative = sum(value(result, "false_negative") or 0.0 for result in boolean)
-        true_negative = sum(value(result, "true_negative") or 0.0 for result in boolean)
-        precision = true_positive / (true_positive + false_positive) if true_positive + false_positive else 0.0
-        recall = true_positive / (true_positive + false_negative) if true_positive + false_negative else 0.0
+        totals = dict.fromkeys(
+            ("true_positive", "false_positive", "false_negative", "true_negative", "brier"), 0.0
+        )
+        for scores in boolean:
+            for name in totals:
+                totals[name] += metric(scores, name) or 0.0
+        precision, recall, f1 = precision_recall_f1(
+            totals["true_positive"], totals["false_positive"], totals["false_negative"]
+        )
+        correct = totals["true_positive"] + totals["true_negative"]
         summary["boolean"] = {
             "cells": len(boolean),
-            "accuracy": round((true_positive + true_negative) / len(boolean), 12),
-            "precision": round(precision, 12),
-            "recall": round(recall, 12),
-            "f1": round(2 * precision * recall / (precision + recall), 12)
-            if precision + recall
-            else 0.0,
-            "brier": round(
-                sum(value(result, "brier") or 0.0 for result in boolean) / len(boolean), 12
-            ),
+            "accuracy": round_score(correct / len(boolean)),
+            "precision": round_score(precision),
+            "recall": round_score(recall),
+            "f1": round_score(f1),
+            "brier": round_score(totals["brier"] / len(boolean)),
         }
 
     if ranking:
-        metric_names = sorted(
-            {
-                name
-                for result in ranking
-                for name in result["outcome"]["scores"]
-                if name.startswith(("recall_at_", "ndcg_at_"))
-                or name in {"reciprocal_rank", "brier", "soft_score", "required_top_k"}
-            }
-        )
-        ranking_summary: JsonDict = {"cells": len(ranking)}
-        for name in metric_names:
-            values = [metric for result in ranking if (metric := value(result, name)) is not None]
-            if values:
-                ranking_summary[name] = round(sum(values) / len(values), 12)
-        summary["ranking"] = ranking_summary
+        # Average every score the ranking scorer emits, so a new metric needs no
+        # matching edit here; schema_validity is reported once above instead.
+        sums: dict[str, float] = {}
+        counts: dict[str, int] = {}
+        for scores in ranking:
+            for name, score in scores.items():
+                if name == "schema_validity":
+                    continue
+                sums[name] = sums.get(name, 0.0) + float(score["value"])
+                counts[name] = counts.get(name, 0) + 1
+        summary["ranking"] = {"cells": len(ranking)} | {
+            name: round_score(sums[name] / counts[name]) for name in sorted(sums)
+        }
     return summary
 
 

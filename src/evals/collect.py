@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from . import SCHEMA_VERSION
-from .classifier import ClassifierError, score_classifier_result
+from .classifier import ClassifierError, invalid_summary, score_classifier_result
 from .container import AgentRunner, AgentRunRequest
 from .matrix import Cell, spec_hash
 from .pi import final_assistant_text, utc_now
@@ -55,9 +55,7 @@ def source_sha(repo_root: Path) -> str:
     return completed.stdout.strip() if completed.returncode == 0 else "unknown"
 
 
-def build_cell_prompt(
-    experiment: Experiment, cell: Cell, workspace_input: Path | None
-) -> tuple[str, bool]:
+def build_cell_prompt(experiment: Experiment, cell: Cell) -> tuple[str, bool]:
     """Return (prompt, no_tools) for the task kind."""
     task = experiment.task
     if task.kind.startswith("transform"):
@@ -103,7 +101,12 @@ def run_evaluator(experiment: Experiment, worktree: Path, cell_dir: Path) -> Jso
         if not isinstance(summary.get("scores"), dict) or "pass" not in summary:
             raise CellError("evaluator JSON must contain scores mapping and pass boolean")
 
-    summary["exit_code"] = completed.returncode
+    return write_evaluator_summary(cell_dir, summary, completed.returncode)
+
+
+def write_evaluator_summary(cell_dir: Path, summary: JsonDict, exit_code: int) -> JsonDict:
+    """Stamp the exit code and write the one evaluator.json format bundles read."""
+    summary["exit_code"] = exit_code
     (cell_dir / "evaluator.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -120,21 +123,10 @@ def run_classifier_evaluator(experiment: Experiment, output_text: str, cell_dir:
         summary = score_classifier_result(result, expected)
         log = "classifier result is valid\n"
     except (json.JSONDecodeError, OSError, ClassifierError) as error:
-        summary = {
-            "schema_version": 1,
-            "kind": "invalid",
-            "pass": False,
-            "k": None,
-            "scores": {"schema_validity": {"value": 0.0, "max": 1.0}},
-            "error": str(error),
-        }
+        summary = invalid_summary(str(error))
         log = f"classifier result is invalid: {error}\n"
-    summary["exit_code"] = 0 if summary["pass"] else 1
     (cell_dir / "evaluator.log").write_text(log, encoding="utf-8")
-    (cell_dir / "evaluator.json").write_text(
-        json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    return summary
+    return write_evaluator_summary(cell_dir, summary, 0 if summary["pass"] else 1)
 
 
 def run_cell(
@@ -179,7 +171,7 @@ def run_cell(
         encoding="utf-8",
     )
 
-    prompt, no_tools = build_cell_prompt(experiment, cell, None)
+    prompt, no_tools = build_cell_prompt(experiment, cell)
 
     env: dict[str, str] = {}
     if provider.api_key_env:
