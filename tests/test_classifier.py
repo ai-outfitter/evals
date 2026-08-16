@@ -13,6 +13,7 @@ from types import SimpleNamespace
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
 from evals.classifier import (
+    MAX_RELEVANCE_GRADE,
     ClassifierError,
     invalid_summary,
     score_classifier_result,
@@ -20,6 +21,7 @@ from evals.classifier import (
     validate_classifier_result,
 )
 from evals.cli import main
+from evals.resources import read_schema
 from evals.reduce import classifier_by_agent_lines, classifier_metrics, markdown_report
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
@@ -122,6 +124,58 @@ class ClassifierSchemaTests(unittest.TestCase):
         with self.assertRaises(ClassifierError):
             validate_classifier_expected(expected)
 
+    def test_expected_contract_accepts_the_maximum_relevance_grade(self):
+        expected = {
+            "schema_version": 1,
+            "kind": "ranking",
+            "required_ids": ["a"],
+            "relevance_grades": {"a": MAX_RELEVANCE_GRADE},
+        }
+        self.assertEqual(
+            validate_classifier_expected(expected)["relevance_grades"]["a"],
+            MAX_RELEVANCE_GRADE,
+        )
+
+    def test_expected_contract_rejects_a_relevance_grade_above_the_maximum(self):
+        expected = {
+            "schema_version": 1,
+            "kind": "ranking",
+            "required_ids": ["a"],
+            "relevance_grades": {"a": MAX_RELEVANCE_GRADE + 1},
+        }
+        with self.assertRaisesRegex(ClassifierError, "finite and at most 1000"):
+            validate_classifier_expected(expected)
+
+    def test_expected_contract_rejects_an_infinite_relevance_grade(self):
+        """`json.loads` accepts the Infinity literal, and an infinite grade makes
+        the exponential gain infinite, so the range guard has to reject it."""
+        expected = json.loads(
+            '{"schema_version": 1, "kind": "ranking", "required_ids": ["a"],'
+            ' "relevance_grades": {"a": Infinity}}'
+        )
+        self.assertTrue(math.isinf(expected["relevance_grades"]["a"]))
+        with self.assertRaisesRegex(ClassifierError, "finite and at most 1000"):
+            validate_classifier_expected(expected)
+
+    def test_expected_contract_rejects_a_not_a_number_relevance_grade(self):
+        """NaN defeats both minimum and maximum (every comparison with NaN is
+        false), so only the range guard stands between it and a NaN nDCG."""
+        expected = json.loads(
+            '{"schema_version": 1, "kind": "ranking", "required_ids": ["a"],'
+            ' "relevance_grades": {"a": NaN}}'
+        )
+        self.assertTrue(math.isnan(expected["relevance_grades"]["a"]))
+        with self.assertRaisesRegex(ClassifierError, "finite and at most 1000"):
+            validate_classifier_expected(expected)
+
+    def test_schema_maximum_matches_the_relevance_grade_constant(self):
+        schema = read_schema("classifier-expected.schema.json")
+        ranking = next(
+            branch for branch in schema["oneOf"] if branch["properties"]["kind"]["const"] == "ranking"
+        )
+        grades = ranking["properties"]["relevance_grades"]["additionalProperties"]
+        self.assertEqual(grades["maximum"], MAX_RELEVANCE_GRADE)
+
 
 class ClassifierFixtureTests(unittest.TestCase):
     @classmethod
@@ -200,6 +254,23 @@ class ClassifierScoringTests(unittest.TestCase):
             + 0.20 * 0.9
         )
         self.assertAlmostEqual(result["scores"]["soft_score"]["value"], expected_soft)
+
+    def test_ranking_metrics_stay_finite_at_the_maximum_relevance_grade(self):
+        """2**1000 is representable but 2**1024 is not, so the cap is what keeps
+        the exponential gain — and every metric derived from it — a real number."""
+        expected = {
+            "schema_version": 1,
+            "kind": "ranking",
+            "required_ids": ["a", "b"],
+            "relevance_grades": {"a": MAX_RELEVANCE_GRADE, "b": MAX_RELEVANCE_GRADE},
+        }
+        result = score_classifier_result(ranking_result(), expected, k=2)
+        ndcg = result["scores"]["ndcg_at_2"]["value"]
+        soft = result["scores"]["soft_score"]["value"]
+        self.assertTrue(math.isfinite(ndcg))
+        self.assertTrue(math.isfinite(soft))
+        self.assertAlmostEqual(ndcg, 1.0)
+        self.assertAlmostEqual(soft, 0.50 + 0.30)
 
     def test_ranking_soft_score_uses_zero_calibration_without_labels(self):
         expected = {

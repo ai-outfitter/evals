@@ -27,7 +27,7 @@
         },
         "relevance_grades": {
           "type": "object",
-          "additionalProperties": {"type": "number", "minimum": 0}
+          "additionalProperties": {"type": "number", "minimum": 0, "maximum": 1000}
         },
         "binary_labels": {
           "type": "object",

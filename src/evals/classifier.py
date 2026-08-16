@@ -15,6 +15,11 @@ JsonDict = dict[str, Any]
 
 SCORE_PRECISION = 12
 
+# nDCG gain is exponential in the grade, so an uncapped grade overflows float64
+# (2**1024 is inf) and takes nDCG with it. 1000 is the shared AutoImprove cap,
+# and classifier-expected.schema.json states the same maximum.
+MAX_RELEVANCE_GRADE = 1000
+
 
 class ClassifierError(RuntimeError):
     """Raised when a classifier result or hidden label is not valid."""
@@ -60,12 +65,23 @@ def validate_classifier_result(document: Any) -> JsonDict:
 
 def validate_classifier_expected(document: Any) -> JsonDict:
     """Validate a hidden expected label."""
-    expected = _validate(document, "classifier-expected.schema.json", "classifier expected label")
-    if expected["kind"] == "ranking" and any(
-        not math.isfinite(float(grade)) for grade in expected.get("relevance_grades", {}).values()
-    ):
-        raise ClassifierError("classifier expected label: relevance grades must be finite")
-    return expected
+    # Check the grade range before the schema pass, for two reasons: the oneOf
+    # error the schema emits names neither the field nor the constraint, and NaN
+    # slips past minimum and maximum entirely (every comparison with NaN is
+    # false). Anything else malformed still falls through to the schema error.
+    if isinstance(document, dict) and document.get("kind") == "ranking":
+        grades = document.get("relevance_grades")
+        if isinstance(grades, dict) and any(
+            isinstance(grade, (int, float))
+            and not isinstance(grade, bool)
+            and not (math.isfinite(float(grade)) and float(grade) <= MAX_RELEVANCE_GRADE)
+            for grade in grades.values()
+        ):
+            raise ClassifierError(
+                "classifier expected label: relevance grades must be finite and at most "
+                f"{MAX_RELEVANCE_GRADE}"
+            )
+    return _validate(document, "classifier-expected.schema.json", "classifier expected label")
 
 
 def round_score(value: float) -> float:
