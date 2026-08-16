@@ -2,7 +2,7 @@
 
 This experiment is a declarative example. It is not a recorded model result.
 
-The matrix fixes the model and the thinking level. It repeats each cell three times. The matrix changes only the agent instruction file.
+The matrix fixes the model and the thinking level. It repeats each cell three times. The matrix changes only the agent instruction file. All cells repeat one labeled case, so the pooled metrics summarize repetitions of that one case. They do not summarize a dataset.
 
 The task supplies one evidence bundle to the agent. The task keeps the expected label in a separate file. The harness does not add that label to the agent prompt.
 

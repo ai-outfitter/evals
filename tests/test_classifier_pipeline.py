@@ -121,7 +121,7 @@ class JudgingInputValidationTests(unittest.TestCase):
 
 
 class ClassifierCliPipelineTests(unittest.TestCase):
-    """`evals run -> reduce -> bundle --validate` for a transform-classifier."""
+    """`evals run -> judge -> prefer -> reduce -> bundle --validate`."""
 
     def setUp(self):
         self.run_id = f"pytest-{uuid.uuid4().hex[:8]}"
@@ -135,6 +135,19 @@ class ClassifierCliPipelineTests(unittest.TestCase):
             code = main(list(argv))
         self.assertEqual(code, 0, stdout.getvalue())
         return stdout.getvalue()
+
+    def assert_pair_isolates_the_agent(self, comparison: dict) -> None:
+        """exp-003 varies only the agent, so every recorded pair must too."""
+        left, right = (
+            json.loads(
+                (self.paths.cells / comparison[side] / "result.json").read_text(encoding="utf-8")
+            )
+            for side in ("left", "right")
+        )
+        self.assertNotEqual(left["variant"]["agent"], right["variant"]["agent"])
+        for field in ("provider", "requested_model", "thinking"):
+            self.assertEqual(left["variant"][field], right["variant"][field])
+        self.assertEqual(left["experiment"]["repetition"], right["experiment"]["repetition"])
 
     def test_stub_run_scores_reduces_and_bundles(self):
         experiment = str(EXP_003)
@@ -166,8 +179,40 @@ class ClassifierCliPipelineTests(unittest.TestCase):
                     (result_path.parent / "evaluator.log").read_text(encoding="utf-8"),
                 )
 
+        # A failed contract is still a judgeable output, so the pairwise stages
+        # run over the same cells. exp-003 has one model and one thinking level
+        # and three repetitions, so there is exactly one pair per repetition.
+        self.cli("judge", experiment, "--run-id", self.run_id, "--stub")
+        verdict_paths = [
+            path
+            for path in sorted(self.paths.judgments.glob("*/*.json"))
+            if path.parent.name != "pi-agent"
+        ]
+        self.assertEqual(len(verdict_paths), 3)
+        for verdict_path in verdict_paths:
+            with self.subTest(pair=verdict_path.stem):
+                verdict = json.loads(verdict_path.read_text(encoding="utf-8"))
+                self.assertEqual(verdict["type"], "judge_verdict")
+                self.assertIn(verdict["overall_preference"], {"left", "right", "tie"})
+                self.assert_pair_isolates_the_agent(verdict["comparison"])
+
+        self.cli("prefer", experiment, "--run-id", self.run_id, "--auto", "--rater", "test")
+        preference_paths = sorted(self.paths.preferences.glob("*.json"))
+        self.assertEqual(len(preference_paths), 3)
+        for preference_path in preference_paths:
+            with self.subTest(pair=preference_path.stem):
+                preference = json.loads(preference_path.read_text(encoding="utf-8"))
+                self.assertEqual(preference["rater"]["id"], "test")
+                self.assert_pair_isolates_the_agent(preference["comparison"])
+
         self.cli("reduce", experiment, "--run-id", self.run_id)
         summary = json.loads((self.paths.root / "results.json").read_text(encoding="utf-8"))
+        self.assertEqual(summary["judge_verdicts"], 3)
+        self.assertEqual(summary["human_preferences"], 3)
+        # Every pair isolates the agent, so that is the only axis either
+        # pairwise tally can be broken out by.
+        self.assertEqual(set(summary["judge_wins"]), {"agent"})
+        self.assertEqual(set(summary["human_wins"]), {"agent"})
         metrics = summary["classifier_metrics"]
         self.assertEqual(metrics["total_cells"], 6)
         self.assertEqual(metrics["valid_cells"], 0)
@@ -179,7 +224,9 @@ class ClassifierCliPipelineTests(unittest.TestCase):
         # columns at all: the header and delimiter still have to agree.
         report = (self.paths.root / "report.md").read_text(encoding="utf-8")
         self.assertIn("### By agent", report)
-        section = report.split("### By agent", 1)[1]
+        # Stop at the next top-level heading: the judge and human preference
+        # tables follow this section and have widths of their own.
+        section = report.split("### By agent", 1)[1].split("\n## ", 1)[0]
         rows = [line for line in section.splitlines() if line.startswith("|")]
         self.assertEqual(len(rows), 4)  # header, delimiter, one row per agent
         self.assertEqual({len(row.strip("|").split("|")) for row in rows}, {3})

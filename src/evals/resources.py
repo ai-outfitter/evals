@@ -2,11 +2,11 @@
 
 The canonical copies live in the repository's `schemas/` directory, which
 `Path(__file__)` alone stops finding once `evals` is installed as a wheel
-somewhere else. The wheel therefore ships `evals/schemas/` (declared as
-package data in pyproject.toml, kept byte-identical to the root copies by
-tests/test_packaging.py), and lookup asks the installed distribution first
-before walking up from this file and from the working directory. That order is
-what lets an installed `evals score-classifier` run from any directory.
+somewhere else. The wheel therefore ships `evals/schemas/` (declared as package
+data in pyproject.toml, kept byte-identical to the root copies by
+tests/test_packaging.py), and lookup reads that packaged copy and nothing else.
+Depending on neither a checkout nor the working directory is what lets an
+installed `evals score-classifier` run from any directory.
 
 A schema that cannot be found or read is the harness's own fault, never a
 candidate's: that distinction is why lookup raises HarnessError rather than a
@@ -29,40 +29,18 @@ class HarnessError(RuntimeError):
     """Raised when the harness itself is misinstalled or missing its own files."""
 
 
-def packaged_schema_dir() -> Path | None:
-    """The schemas shipped inside the installed `evals` package, if readable."""
-    try:
-        directory = Path(str(resources.files(__package__) / SCHEMA_DIR_NAME))
-    except (ModuleNotFoundError, TypeError, ValueError):
-        return None
-    return directory if directory.is_dir() else None
-
-
-def schema_dirs() -> list[Path]:
-    """Every directory that could hold the schemas, most specific first."""
-    here = Path(__file__).resolve()
-    cwd = Path.cwd().resolve()
-    directories: list[Path] = []
-    packaged = packaged_schema_dir()
-    if packaged is not None:
-        directories.append(packaged)
-    roots = [here.parent, *here.parents, cwd, *cwd.parents]
-    for root in roots:
-        candidate = root / SCHEMA_DIR_NAME
-        if candidate not in directories:
-            directories.append(candidate)
-    return directories
-
-
 def schema_path(name: str) -> Path:
-    for directory in schema_dirs():
-        candidate = directory / name
-        if candidate.is_file():
-            return candidate
-    raise HarnessError(
-        f"cannot locate schema {name}: no {SCHEMA_DIR_NAME}/ directory above "
-        f"{Path(__file__).resolve().parent} or {Path.cwd().resolve()}"
-    )
+    """The packaged schema of that name, or HarnessError if it is not shipped."""
+    try:
+        candidate = Path(str(resources.files(__package__) / SCHEMA_DIR_NAME / name))
+    except (ModuleNotFoundError, TypeError, ValueError) as error:
+        raise HarnessError(f"cannot locate schema {name}: {error}") from error
+    if not candidate.is_file():
+        raise HarnessError(
+            f"cannot locate schema {name}: the installed evals package does not "
+            f"ship {SCHEMA_DIR_NAME}/{name}"
+        )
+    return candidate
 
 
 def read_schema(name: str) -> JsonDict:

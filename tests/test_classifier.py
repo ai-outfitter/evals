@@ -8,6 +8,7 @@ import pathlib
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
@@ -19,7 +20,7 @@ from evals.classifier import (
     validate_classifier_result,
 )
 from evals.cli import main
-from evals.reduce import classifier_by_agent_lines, classifier_metrics
+from evals.reduce import classifier_by_agent_lines, classifier_metrics, markdown_report
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
@@ -77,6 +78,38 @@ class ClassifierSchemaTests(unittest.TestCase):
         result = ranking_result()
         result["items"][2]["score"] = 0.8
         with self.assertRaisesRegex(ClassifierError, "descending order"):
+            validate_classifier_result(result)
+
+    def test_boolean_contract_rejects_a_not_a_number_confidence(self):
+        """`json.loads` accepts the NaN literal, and NaN slips past minimum and
+        maximum (both are comparisons, and every comparison with NaN is false),
+        so only the finite guard stands between NaN and a NaN Brier score."""
+        result = json.loads(
+            '{"schema_version": 1, "kind": "boolean", "decision": true,'
+            ' "confidence": NaN, "evidence_refs": ["source:1"]}'
+        )
+        self.assertTrue(math.isnan(result["confidence"]))
+        with self.assertRaisesRegex(ClassifierError, "confidence must be finite"):
+            validate_classifier_result(result)
+
+    def test_ranking_contract_rejects_a_not_a_number_score(self):
+        result = json.loads(
+            '{"schema_version": 1, "kind": "ranking", "items": ['
+            '{"id": "a", "score": NaN, "confidence": 0.8, "evidence_refs": ["source:a"]}]}'
+        )
+        self.assertTrue(math.isnan(result["items"][0]["score"]))
+        # NaN also defeats the descending-order comparison, so the finite guard
+        # has to be the one that fires.
+        with self.assertRaisesRegex(ClassifierError, "must be finite"):
+            validate_classifier_result(result)
+
+    def test_ranking_contract_rejects_a_not_a_number_confidence(self):
+        result = json.loads(
+            '{"schema_version": 1, "kind": "ranking", "items": ['
+            '{"id": "a", "score": 0.9, "confidence": NaN, "evidence_refs": ["source:a"]}]}'
+        )
+        self.assertTrue(math.isnan(result["items"][0]["confidence"]))
+        with self.assertRaisesRegex(ClassifierError, "must be finite"):
             validate_classifier_result(result)
 
     def test_expected_contract_rejects_negative_relevance_grade(self):
@@ -232,9 +265,16 @@ def classifier_cell(
     scores: dict, *, agent: str = "classifier-seed", status: str = "pass"
 ) -> dict:
     return {
-        "experiment": {"kind": "transform-classifier"},
+        "experiment": {"kind": "transform-classifier", "repetition": 1},
         "variant": {"provider": "ollama", "requested_model": "qwen3:4b", "thinking": "low", "agent": agent},
-        "outcome": {"status": status, "scores": scores},
+        "outcome": {
+            "status": status,
+            "failure_class": {"pass": "none", "invalid": "infrastructure"}.get(
+                status, "benchmark"
+            ),
+            "scores": scores,
+        },
+        "execution": {"session": {"usage": {"output": 0}, "wall_clock_seconds": 0.0}},
     }
 
 
@@ -242,6 +282,20 @@ def boolean_scores(decision: bool, confidence: float, label: bool) -> dict:
     return score_classifier_result(
         boolean_result(decision, confidence),
         {"schema_version": 1, "kind": "boolean", "label": label},
+    )["scores"]
+
+
+def ranking_scores(*, k: int = 3, required_ids: list[str] | None = None, **expected: object) -> dict:
+    """Real scorer output, so these tests cannot drift from the ranking semantics."""
+    return score_classifier_result(
+        ranking_result(),
+        {
+            "schema_version": 1,
+            "kind": "ranking",
+            "required_ids": ["a", "c"] if required_ids is None else required_ids,
+            **expected,
+        },
+        k=k,
     )["scores"]
 
 
@@ -315,6 +369,104 @@ class ClassifierReportTests(unittest.TestCase):
         self.assertTrue(any(line.startswith("| classifier-candidate |") for line in report))
         self.assertTrue(any(line.startswith("| classifier-seed |") for line in report))
         self.assertEqual(len(table_widths(report)), 1)
+
+    def test_ranking_metrics_average_every_score_the_scorer_emits(self):
+        plain = ranking_scores(k=3)
+        labeled = ranking_scores(k=3, binary_labels={"a": True, "b": False})
+        summary = classifier_metrics(
+            {"r1": classifier_cell(plain), "r2": classifier_cell(labeled)}
+        )
+        self.assertNotIn("boolean", summary)
+        ranking = summary["ranking"]
+        self.assertEqual(ranking["cells"], 2)
+        self.assertEqual(ranking["recall_at_3"], 1.0)
+        self.assertEqual(ranking["required_top_k"], 1.0)
+        self.assertAlmostEqual(
+            ranking["soft_score"],
+            (plain["soft_score"]["value"] + labeled["soft_score"]["value"]) / 2,
+        )
+        # Brier is emitted only by the labeled cell, so it averages over the
+        # cells that carry it rather than counting the other one as zero.
+        self.assertAlmostEqual(ranking["brier"], labeled["brier"]["value"])
+        # Schema validity is reported once above, not averaged in as a metric.
+        self.assertNotIn("schema_validity", ranking)
+        self.assertEqual(summary["schema_validity_rate"], 1.0)
+
+    def test_the_by_agent_table_reads_ranking_metrics_when_there_is_no_boolean_block(self):
+        summary = classifier_metrics(
+            {
+                "seed-1": classifier_cell(
+                    ranking_scores(k=2), agent="classifier-seed", status="fail"
+                ),
+                "cand-1": classifier_cell(
+                    ranking_scores(k=2, required_ids=["a"]), agent="classifier-candidate"
+                ),
+            }
+        )
+        by_agent = summary["by_agent"]
+        self.assertNotIn("boolean", by_agent["classifier-seed"])
+        self.assertEqual(by_agent["classifier-seed"]["ranking"]["recall_at_2"], 0.5)
+        self.assertEqual(by_agent["classifier-candidate"]["ranking"]["recall_at_2"], 1.0)
+
+        lines = classifier_by_agent_lines(by_agent)
+        rows = table_rows(lines)
+        header = [cell.strip() for cell in rows[0].strip("|").split("|")]
+        self.assertEqual(header[:3], ["agent", "cells", "schema validity"])
+        self.assertIn("recall_at_2", header)
+        self.assertEqual(table_widths(lines), {len(header)})
+        # No group has a boolean block, so every metric column comes from the
+        # ranking fallback and none of them renders as a missing value.
+        for row in rows[2:]:
+            with self.subTest(row=row):
+                self.assertNotIn("—", row)
+
+    def test_a_mixed_boolean_and_ranking_table_still_lines_up(self):
+        summary = classifier_metrics(
+            {
+                "seed-1": classifier_cell(
+                    boolean_scores(True, 0.8, True), agent="classifier-seed"
+                ),
+                "cand-1": classifier_cell(ranking_scores(k=2), agent="classifier-candidate"),
+            }
+        )
+        lines = classifier_by_agent_lines(summary["by_agent"])
+        rows = table_rows(lines)
+        header = [cell.strip() for cell in rows[0].strip("|").split("|")]
+        self.assertIn("accuracy", header)
+        self.assertIn("recall_at_2", header)
+        self.assertEqual(table_widths(lines), {len(header)})
+        # Each group fills only its own kind's columns; the rest are dashes.
+        for row in rows[2:]:
+            with self.subTest(row=row):
+                self.assertIn("—", row)
+
+    def test_the_report_renders_pooled_ranking_metrics(self):
+        results = {
+            "cell-a": classifier_cell(ranking_scores(k=3), agent="classifier-candidate"),
+            "cell-b": classifier_cell(boolean_scores(True, 0.8, True), agent="classifier-seed"),
+        }
+        report = markdown_report(
+            SimpleNamespace(
+                id="exp-test-classifier", document={"question": "does the instruction help?"}
+            ),
+            results,
+            {},
+            {},
+            {},
+            classifier_metrics(results),
+        )
+        self.assertIn("## Classifier metrics", report)
+        self.assertIn("### Boolean (pooled)", report)
+        self.assertIn("### Ranking (pooled)", report)
+        self.assertIn("### By agent", report)
+        self.assertIn("| recall_at_3 |", report)
+
+        section = report.split("## Classifier metrics", 1)[1].split("\n## ", 1)[0]
+        blocks = section.split("### ")[1:]
+        self.assertEqual(len(blocks), 3)
+        for block in blocks:
+            with self.subTest(block=block.splitlines()[0]):
+                self.assertEqual(len(table_widths(block.splitlines())), 1)
 
     def test_an_all_invalid_agent_group_renders_a_valid_table(self):
         """No metric name survives, so the delimiter must shrink with the header."""
