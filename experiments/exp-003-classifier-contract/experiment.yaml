@@ -1,0 +1,46 @@
+schema_version: 2
+id: exp-003-classifier-contract
+question: >
+  Does the candidate classifier instruction improve the typed classifier result
+  when the model, thinking level, input, evaluator, and run count stay fixed?
+independent_variables: [agent]
+
+container:
+  image: localhost/evals-agent
+  digest: null
+
+providers: ../../models.yaml
+
+agents:
+  classifier-seed: agents/classifier-seed.md
+  classifier-candidate: agents/classifier-candidate.md
+
+matrix:
+  model: ["ollama/qwen3:4b"]
+  thinking: [low]
+  agent: [classifier-seed, classifier-candidate]
+  repetitions: 3
+
+task: ../../tasks/classifier-contract-boolean/task.yaml
+
+limits:
+  cell_timeout_seconds: 300
+
+judges:
+  - id: judge-classifier
+    model: "ollama/nemotron-3-nano:4b"
+    thinking: off
+    rubric: ../../judges/classifier-rubric.yaml
+
+judging:
+  mode: pairwise
+  blinding: randomized-ab
+  inputs: [output, evaluator_summary]
+
+human:
+  mode: pairwise
+  metrics: [correctness, evidence, calibration]
+
+provenance:
+  require_image_digest: false
+  bundle: reproducible-tar

@@ -1,0 +1,11 @@
+version: "1"
+instructions: |
+  Compare two classifier JSON results. Use the supplied evidence.
+  Do not use the model or agent identity.
+metrics:
+  - id: correctness
+    description: The decision agrees with the supplied evidence.
+  - id: evidence
+    description: The result cites only evidence identifiers from the input.
+  - id: calibration
+    description: The confidence is reasonable for the evidence strength.

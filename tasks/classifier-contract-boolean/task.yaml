@@ -1,0 +1,17 @@
+schema_version: 2
+id: classifier-contract-boolean
+kind: transform-classifier
+input: input/case.json
+expected: expected/case.json
+prompt: |
+  Classify the claim from the supplied evidence.
+  Return only one JSON object that follows classifier-result/v1.
+  Use boolean mode.
+metrics:
+  - accuracy
+  - precision
+  - recall
+  - f1
+  - brier
+  - schema_validity
+untrusted: true
