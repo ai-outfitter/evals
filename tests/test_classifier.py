@@ -8,7 +8,6 @@ import pathlib
 import sys
 import tempfile
 import unittest
-import uuid
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
@@ -21,8 +20,6 @@ from evals.classifier import (
 )
 from evals.cli import main
 from evals.reduce import classifier_by_agent_lines, classifier_metrics
-from evals.spec import run_paths
-from evals.bundle import clean_run
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
@@ -248,6 +245,15 @@ def boolean_scores(decision: bool, confidence: float, label: bool) -> dict:
     )["scores"]
 
 
+def table_rows(lines: list[str]) -> list[str]:
+    return [line for line in lines if line.startswith("|")]
+
+
+def table_widths(lines: list[str]) -> set[int]:
+    """Cell counts per row: a GFM table renders only if every row agrees."""
+    return {len(row.strip("|").split("|")) for row in table_rows(lines)}
+
+
 class ClassifierReportTests(unittest.TestCase):
     def test_boolean_report_metrics_use_confusion_totals(self):
         summary = classifier_metrics(
@@ -308,37 +314,29 @@ class ClassifierReportTests(unittest.TestCase):
         self.assertIn("### By agent", report)
         self.assertTrue(any(line.startswith("| classifier-candidate |") for line in report))
         self.assertTrue(any(line.startswith("| classifier-seed |") for line in report))
+        self.assertEqual(len(table_widths(report)), 1)
 
-    def test_classifier_stub_pipeline_reports_invalid_schema(self):
-        run_id = f"classifier-{uuid.uuid4().hex[:8]}"
-        experiment = REPO / "experiments" / "exp-003-classifier-contract" / "experiment.yaml"
-        paths = run_paths(REPO, "exp-003-classifier-contract", run_id)
-        try:
-            self.assertEqual(
-                main(
-                    [
-                        "run",
-                        str(experiment),
-                        "--run-id",
-                        run_id,
-                        "--stub",
-                        "--filter",
-                        "agent=classifier-seed",
-                    ]
-                ),
-                0,
-            )
-            result_paths = sorted(paths.cells.glob("*/result.json"))
-            self.assertEqual(len(result_paths), 3)
-            result = json.loads(result_paths[0].read_text(encoding="utf-8"))
-            self.assertEqual(result["outcome"]["status"], "fail")
-            self.assertEqual(result["outcome"]["failure_class"], "benchmark")
-            self.assertEqual(result["outcome"]["scores"]["schema_validity"]["value"], 0)
-            self.assertEqual(main(["reduce", str(experiment), "--run-id", run_id]), 0)
-            summary = json.loads((paths.root / "results.json").read_text(encoding="utf-8"))
-            self.assertEqual(summary["classifier_metrics"]["schema_validity_rate"], 0)
-        finally:
-            clean_run(paths)
+    def test_an_all_invalid_agent_group_renders_a_valid_table(self):
+        """No metric name survives, so the delimiter must shrink with the header."""
+        summary = classifier_metrics(
+            {
+                "seed-1": classifier_cell(
+                    invalid_summary("not JSON")["scores"],
+                    agent="classifier-seed",
+                    status="fail",
+                )
+            }
+        )
+        report = classifier_by_agent_lines(summary["by_agent"])
+        rows = table_rows(report)
+        self.assertEqual(len(rows), 3)  # header, delimiter, one agent row
+        self.assertEqual(table_widths(report), {3})
+        self.assertEqual(
+            [cell.strip() for cell in rows[0].strip("|").split("|")],
+            ["agent", "cells", "schema validity"],
+        )
+        self.assertEqual(rows[1], "| --- | ---: | ---: |")
+        self.assertTrue(rows[2].startswith("| classifier-seed | 1 | 0/1 |"))
 
 
 if __name__ == "__main__":

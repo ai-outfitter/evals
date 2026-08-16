@@ -25,11 +25,16 @@ def find_repo_root(start: Path) -> Path:
     raise SpecError(f"could not locate repo root (schemas/) above {start}")
 
 
-def load_schema(repo_root: Path, name: str) -> JsonDict:
-    """The checkout's own schema, falling back to the shared lookup."""
-    path = repo_root / "schemas" / name
-    if path.is_file():
-        return json.loads(path.read_text(encoding="utf-8"))
+def load_schema(name: str) -> JsonDict:
+    """One schema lookup for the whole harness.
+
+    Spec validation and classifier validation used to disagree about which
+    copy wins — spec preferred the checkout's `schemas/`, the classifier
+    preferred the packaged one — so the same document could validate
+    differently depending on which path reached it. Both now go through
+    `resources.read_schema`, and tests/test_packaging.py keeps the two copies
+    byte-identical so the single precedence never hides a difference.
+    """
     return read_schema(name)
 
 
@@ -241,7 +246,7 @@ class Experiment:
 
 def load_task(path: Path, repo_root: Path) -> Task:
     document = load_yaml_file(path, "task spec")
-    validate_against(load_schema(repo_root, "task.schema.json"), document, f"task spec {path}")
+    validate_against(load_schema("task.schema.json"), document, f"task spec {path}")
 
     def resolve(name: str) -> Path | None:
         value = document.get(name)
@@ -290,7 +295,7 @@ def load_experiment(path: Path) -> Experiment:
     contained(path, repo_root, "experiment")
     document = load_yaml_file(path, "experiment spec")
     validate_against(
-        load_schema(repo_root, "experiment.schema.json"), document, f"experiment {path}"
+        load_schema("experiment.schema.json"), document, f"experiment {path}"
     )
 
     registry = load_provider_registry(
@@ -322,6 +327,16 @@ def load_experiment(path: Path) -> Experiment:
             validate_classifier_expected(expected)
         except (OSError, json.JSONDecodeError, ClassifierError) as error:
             raise SpecError(f"task {task.id}: invalid expected label: {error}") from error
+        # The evaluator summary is derived from the hidden expected label, so
+        # showing it to a judge hands over the answer key and makes the judge
+        # score a restatement of the deterministic one. A comment cannot stop
+        # that, so the spec refuses to load instead.
+        if "evaluator_summary" in [str(v) for v in document["judging"]["inputs"]]:
+            raise SpecError(
+                f"task {task.id}: transform-classifier experiments must not put "
+                "evaluator_summary in judging.inputs: it is computed from the "
+                "hidden expected label"
+            )
 
     judges = []
     for raw in document["judges"]:

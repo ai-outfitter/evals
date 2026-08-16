@@ -348,7 +348,7 @@ def run_cell(
         "artifacts": sorted(artifacts),
     }
     validate_against(
-        load_schema(experiment.repo_root, "result.schema.json"), result, f"result {cell.cell_id}"
+        load_schema("result.schema.json"), result, f"result {cell.cell_id}"
     )
     result_path.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 

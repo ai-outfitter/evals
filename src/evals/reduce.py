@@ -233,12 +233,16 @@ def classifier_by_agent_lines(by_agent: JsonDict) -> list[str]:
             if name != "cells"
         }
     )
+    # A group whose every cell failed the contract has no metric names at all,
+    # so the delimiter row has to follow the columns actually emitted rather
+    # than assume the three fixed ones plus a non-empty tail.
+    columns = ["agent", "cells", "schema validity", *names]
     lines = [
         "",
         "### By agent",
         "",
-        "| agent | cells | schema validity | " + " | ".join(names) + " |",
-        "| --- | ---: | ---: |" + " ---: |" * len(names),
+        "| " + " | ".join(columns) + " |",
+        "| --- |" + " ---: |" * (len(columns) - 1),
     ]
     for agent, group in sorted(by_agent.items()):
         row = [

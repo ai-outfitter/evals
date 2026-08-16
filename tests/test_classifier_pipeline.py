@@ -13,6 +13,7 @@ import io
 import json
 import pathlib
 import sys
+import tarfile
 import tempfile
 import unittest
 import uuid
@@ -29,7 +30,7 @@ from evals.judge import build_judge_prompt, load_side_inputs
 from evals.matrix import expand_matrix, spec_hash
 from evals.reduce import run_reduce
 from evals.resources import HarnessError, read_schema, schema_path
-from evals.spec import load_experiment, run_paths
+from evals.spec import SpecError, load_experiment, run_paths
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 EXP_003 = REPO / "experiments" / "exp-003-classifier-contract" / "experiment.yaml"
@@ -86,6 +87,115 @@ def collect(experiment, cell, paths, runner) -> dict:
         runtime_version="stub",
     )
     return json.loads((paths.cells / cell.cell_id / "result.json").read_text(encoding="utf-8"))
+
+
+class JudgingInputValidationTests(unittest.TestCase):
+    """A classifier spec may not route the answer key to the judge."""
+
+    def write_variant(self, text: str) -> pathlib.Path:
+        """A spec beside exp-003, so its relative agent and task paths resolve.
+
+        `contained()` refuses anything outside the repo, so a system tempdir
+        cannot host this; the name stays clear of the `experiment.yaml` glob
+        that scripts/check.sh validates for success.
+        """
+        path = EXP_003.parent / f"pytest-{uuid.uuid4().hex[:8]}.yaml"
+        path.write_text(text, encoding="utf-8")
+        self.addCleanup(path.unlink, missing_ok=True)
+        return path
+
+    def test_evaluator_summary_in_judging_inputs_is_refused_at_load(self):
+        text = EXP_003.read_text(encoding="utf-8")
+        self.assertIn("inputs: [output]", text)
+        path = self.write_variant(text.replace("inputs: [output]", "inputs: [output, evaluator_summary]"))
+        with self.assertRaises(SpecError) as caught:
+            load_experiment(path)
+        message = str(caught.exception)
+        self.assertIn("evaluator_summary", message)
+        self.assertIn("judging.inputs", message)
+
+    def test_an_unchanged_copy_still_loads(self):
+        """The guard rejects the input, not merely any spec written elsewhere."""
+        path = self.write_variant(EXP_003.read_text(encoding="utf-8"))
+        self.assertEqual(load_experiment(path).judging_inputs, ["output"])
+
+
+class ClassifierCliPipelineTests(unittest.TestCase):
+    """`evals run -> reduce -> bundle --validate` for a transform-classifier."""
+
+    def setUp(self):
+        self.run_id = f"pytest-{uuid.uuid4().hex[:8]}"
+        self.experiment, _ = experiment_and_cells()
+        self.paths = run_paths(REPO, self.experiment.id, self.run_id)
+        self.addCleanup(clean_run, self.paths)
+
+    def cli(self, *argv: str) -> str:
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            code = main(list(argv))
+        self.assertEqual(code, 0, stdout.getvalue())
+        return stdout.getvalue()
+
+    def test_stub_run_scores_reduces_and_bundles(self):
+        experiment = str(EXP_003)
+        # The plain stub answers with prose, not a classifier result: exactly
+        # the benchmark failure the contract is supposed to catch.
+        self.cli("run", experiment, "--run-id", self.run_id, "--stub")
+
+        result_paths = sorted(self.paths.cells.glob("*/result.json"))
+        self.assertEqual(len(result_paths), 6)  # two agents x three repetitions
+        for result_path in result_paths:
+            with self.subTest(cell=result_path.parent.name):
+                result = json.loads(result_path.read_text(encoding="utf-8"))
+                self.assertEqual(result["outcome"]["status"], "fail")
+                self.assertEqual(result["outcome"]["failure_class"], "benchmark")
+                self.assertEqual(result["outcome"]["scores"]["schema_validity"]["value"], 0)
+                self.assertEqual(result["outcome"]["evaluator_exit_code"], 1)
+
+                for artifact in ("evaluator.json", "evaluator.log"):
+                    self.assertIn(artifact, result["artifacts"])
+                    self.assertTrue((result_path.parent / artifact).is_file())
+                summary = json.loads(
+                    (result_path.parent / "evaluator.json").read_text(encoding="utf-8")
+                )
+                self.assertFalse(summary["pass"])
+                self.assertEqual(summary["kind"], "invalid")
+                self.assertTrue(summary["error"])
+                self.assertIn(
+                    "classifier result is invalid",
+                    (result_path.parent / "evaluator.log").read_text(encoding="utf-8"),
+                )
+
+        self.cli("reduce", experiment, "--run-id", self.run_id)
+        summary = json.loads((self.paths.root / "results.json").read_text(encoding="utf-8"))
+        metrics = summary["classifier_metrics"]
+        self.assertEqual(metrics["total_cells"], 6)
+        self.assertEqual(metrics["valid_cells"], 0)
+        self.assertEqual(metrics["schema_validity_rate"], 0)
+        self.assertEqual(metrics["excluded_invalid_cells"], 0)
+        self.assertEqual(set(metrics["by_agent"]), {"classifier-seed", "classifier-candidate"})
+
+        # Every cell failed the contract, so the agent table has no metric
+        # columns at all: the header and delimiter still have to agree.
+        report = (self.paths.root / "report.md").read_text(encoding="utf-8")
+        self.assertIn("### By agent", report)
+        section = report.split("### By agent", 1)[1]
+        rows = [line for line in section.splitlines() if line.startswith("|")]
+        self.assertEqual(len(rows), 4)  # header, delimiter, one row per agent
+        self.assertEqual({len(row.strip("|").split("|")) for row in rows}, {3})
+
+        printed = self.cli("bundle", experiment, "--run-id", self.run_id, "--validate")
+        reports = [json.loads(line) for line in printed.splitlines() if line.startswith("{")]
+        self.assertEqual(len(reports), 6)
+        self.assertTrue(all(report["ok"] for report in reports))
+        # The evaluator artifacts have to travel with the bundle, or a replay
+        # cannot check the score the report is built from.
+        for report in reports:
+            bundle = self.paths.root / "bundles" / f"{report['cell_id']}.tar.gz"
+            with tarfile.open(bundle, "r:gz") as archive:
+                members = set(archive.getnames())
+            self.assertIn("evaluator.json", members)
+            self.assertIn("evaluator.log", members)
 
 
 class PromptIsolationTests(unittest.TestCase):

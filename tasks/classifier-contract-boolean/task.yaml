@@ -6,7 +6,17 @@ expected: expected/case.json
 prompt: |
   Classify the claim from the supplied evidence.
   Return only one JSON object that follows classifier-result/v1.
-  Use boolean mode.
+  Return no prose and no code fences around the object.
+
+  Use boolean mode. The object must hold exactly these five fields:
+
+  - schema_version: the number 1
+  - kind: the string "boolean"
+  - decision: true or false
+  - confidence: a number from 0 to 1, inclusive
+  - evidence_refs: an array of strings, each one different from the others
+
+  Do not add any other field.
 metrics:
   - accuracy
   - precision
