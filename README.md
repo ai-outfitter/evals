@@ -44,7 +44,9 @@ evals prefer tests/fixtures/exp-transform.yaml --run-id demo
 evals reduce tests/fixtures/exp-transform.yaml --run-id demo
 evals bundle tests/fixtures/exp-transform.yaml --run-id demo --validate
 
-evals score-classifier result.json hidden-expected.json --k 20
+# <result.json> is one agent's classifier-result/v1 JSON; <expected.json> is
+# the hidden label kept out of the prompt (tasks/<task-id>/expected/<case>.json).
+evals score-classifier <result.json> <expected.json> --k 20
 ```
 
 The report lands at `runs/<experiment>/<run-id>/report.md`: per-cell status and
@@ -103,6 +105,7 @@ judges/             Judge rubrics
 tests/fixtures/     Harness test fixtures: a worktree and a transform experiment
 schemas/            JSON Schemas: experiment, task, result, verdict, preference
 src/evals/          The harness (evals CLI)
+src/evals/schemas/  Copy of schemas/ shipped in the wheel (checked for drift)
 models.yaml         Provider registry
 flake.nix           Dev shell + agent container image (nix build .#agent-image)
 runs/               Result store (gitignored)

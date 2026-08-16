@@ -14,12 +14,13 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
 from evals.classifier import (
     ClassifierError,
+    invalid_summary,
     score_classifier_result,
     validate_classifier_expected,
     validate_classifier_result,
 )
 from evals.cli import main
-from evals.reduce import classifier_metrics
+from evals.reduce import classifier_by_agent_lines, classifier_metrics
 from evals.spec import run_paths
 from evals.bundle import clean_run
 
@@ -230,27 +231,83 @@ class ClassifierScoringTests(unittest.TestCase):
             self.assertEqual(main(["score-classifier", str(result_path), str(expected_path)]), 0)
 
 
+def classifier_cell(
+    scores: dict, *, agent: str = "classifier-seed", status: str = "pass"
+) -> dict:
+    return {
+        "experiment": {"kind": "transform-classifier"},
+        "variant": {"provider": "ollama", "requested_model": "qwen3:4b", "thinking": "low", "agent": agent},
+        "outcome": {"status": status, "scores": scores},
+    }
+
+
+def boolean_scores(decision: bool, confidence: float, label: bool) -> dict:
+    return score_classifier_result(
+        boolean_result(decision, confidence),
+        {"schema_version": 1, "kind": "boolean", "label": label},
+    )["scores"]
+
+
 class ClassifierReportTests(unittest.TestCase):
     def test_boolean_report_metrics_use_confusion_totals(self):
-        def cell(scores: dict) -> dict:
-            return {
-                "experiment": {"kind": "transform-classifier"},
-                "outcome": {"scores": scores},
+        summary = classifier_metrics(
+            {
+                "a": classifier_cell(boolean_scores(True, 0.8, True)),
+                "b": classifier_cell(boolean_scores(True, 0.7, False)),
             }
-
-        true_positive = score_classifier_result(
-            boolean_result(True, 0.8),
-            {"schema_version": 1, "kind": "boolean", "label": True},
-        )["scores"]
-        false_positive = score_classifier_result(
-            boolean_result(True, 0.7),
-            {"schema_version": 1, "kind": "boolean", "label": False},
-        )["scores"]
-        summary = classifier_metrics({"a": cell(true_positive), "b": cell(false_positive)})
+        )
         self.assertEqual(summary["schema_validity_rate"], 1.0)
         self.assertEqual(summary["boolean"]["accuracy"], 0.5)
         self.assertEqual(summary["boolean"]["precision"], 0.5)
         self.assertEqual(summary["boolean"]["recall"], 1.0)
+
+    def test_infrastructure_and_agent_failures_are_not_schema_failures(self):
+        summary = classifier_metrics(
+            {
+                "ok": classifier_cell(boolean_scores(True, 0.8, True)),
+                "infra": classifier_cell({}, status="invalid"),
+                "agent": classifier_cell({}, status="invalid"),
+            }
+        )
+        self.assertEqual(summary["total_cells"], 1)
+        self.assertEqual(summary["valid_cells"], 1)
+        self.assertEqual(summary["schema_validity_rate"], 1.0)
+        self.assertEqual(summary["excluded_invalid_cells"], 2)
+
+    def test_invalid_model_json_still_counts_against_schema_validity(self):
+        summary = classifier_metrics(
+            {
+                "ok": classifier_cell(boolean_scores(True, 0.8, True)),
+                "bad": classifier_cell(invalid_summary("not JSON")["scores"], status="fail"),
+            }
+        )
+        self.assertEqual(summary["total_cells"], 2)
+        self.assertEqual(summary["schema_validity_rate"], 0.5)
+
+    def test_agent_axis_levels_are_reported_separately(self):
+        summary = classifier_metrics(
+            {
+                "seed-1": classifier_cell(boolean_scores(True, 0.8, True), agent="classifier-seed"),
+                "seed-2": classifier_cell(boolean_scores(False, 0.6, True), agent="classifier-seed"),
+                "cand-1": classifier_cell(
+                    boolean_scores(True, 0.9, True), agent="classifier-candidate"
+                ),
+                "cand-2": classifier_cell(
+                    boolean_scores(True, 0.9, True), agent="classifier-candidate"
+                ),
+            }
+        )
+        by_agent = summary["by_agent"]
+        self.assertEqual(set(by_agent), {"classifier-seed", "classifier-candidate"})
+        self.assertEqual(by_agent["classifier-seed"]["boolean"]["accuracy"], 0.5)
+        self.assertEqual(by_agent["classifier-candidate"]["boolean"]["accuracy"], 1.0)
+        # the pooled summary survives alongside the per-agent breakdown
+        self.assertEqual(summary["boolean"]["accuracy"], 0.75)
+
+        report = classifier_by_agent_lines(by_agent)
+        self.assertIn("### By agent", report)
+        self.assertTrue(any(line.startswith("| classifier-candidate |") for line in report))
+        self.assertTrue(any(line.startswith("| classifier-seed |") for line in report))
 
     def test_classifier_stub_pipeline_reports_invalid_schema(self):
         run_id = f"classifier-{uuid.uuid4().hex[:8]}"

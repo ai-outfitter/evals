@@ -10,10 +10,16 @@ from pathlib import Path
 from typing import Any
 
 from . import SCHEMA_VERSION
-from .classifier import ClassifierError, invalid_summary, score_classifier_result
+from .classifier import (
+    ClassifierError,
+    invalid_summary,
+    score_classifier_result,
+    validate_classifier_expected,
+)
 from .container import AgentRunner, AgentRunRequest
 from .matrix import Cell, spec_hash
 from .pi import final_assistant_text, utc_now
+from .resources import HarnessError
 from .spec import Experiment, RunPaths, load_schema, validate_against
 
 JsonDict = dict[str, Any]
@@ -114,15 +120,28 @@ def write_evaluator_summary(cell_dir: Path, summary: JsonDict, exit_code: int) -
 
 
 def run_classifier_evaluator(experiment: Experiment, output_text: str, cell_dir: Path) -> JsonDict:
-    """Score a strict JSON classifier response against a hidden label file."""
+    """Score a strict JSON classifier response against a hidden label file.
+
+    Only the model's own output can fail the benchmark here. A hidden label
+    file the harness cannot read or validate, and a contract schema it cannot
+    find, are the harness's fault: they raise CellError so the cell records an
+    infrastructure failure instead of charging the candidate for it.
+    """
     task = experiment.task
     assert task.expected is not None
     try:
-        result = json.loads(output_text)
-        expected = json.loads(task.expected.read_text(encoding="utf-8"))
-        summary = score_classifier_result(result, expected)
+        expected = validate_classifier_expected(
+            json.loads(task.expected.read_text(encoding="utf-8"))
+        )
+    except (OSError, json.JSONDecodeError, ClassifierError, HarnessError) as error:
+        raise CellError(f"cannot use expected label {task.expected}: {error}") from error
+
+    try:
+        summary = score_classifier_result(json.loads(output_text), expected)
         log = "classifier result is valid\n"
-    except (json.JSONDecodeError, OSError, ClassifierError) as error:
+    except HarnessError as error:
+        raise CellError(str(error)) from error
+    except (json.JSONDecodeError, ClassifierError) as error:
         summary = invalid_summary(str(error))
         log = f"classifier result is invalid: {error}\n"
     (cell_dir / "evaluator.log").write_text(log, encoding="utf-8")
@@ -221,11 +240,20 @@ def run_cell(
     output_text = final_assistant_text(execution["chat_history"])
     (cell_dir / "output.md").write_text(output_text + "\n", encoding="utf-8")
 
-    if task.kind == "transform-classifier" and infrastructure_error is None:
-        evaluator_summary = run_classifier_evaluator(experiment, output_text, cell_dir)
-        scores = evaluator_summary["scores"]
-        evaluator_exit = evaluator_summary["exit_code"]
-        artifacts.extend(["evaluator.json", "evaluator.log"])
+    agent_ok = execution["agent_status"] == "success"
+
+    # A cell whose agent never finished has no result to hold against the
+    # contract: scoring its empty output would record a schema failure the
+    # model did not commit.
+    if task.kind == "transform-classifier" and infrastructure_error is None and agent_ok:
+        try:
+            evaluator_summary = run_classifier_evaluator(experiment, output_text, cell_dir)
+        except (CellError, HarnessError) as error:
+            infrastructure_error = str(error)
+        else:
+            scores = evaluator_summary["scores"]
+            evaluator_exit = evaluator_summary["exit_code"]
+            artifacts.extend(["evaluator.json", "evaluator.log"])
 
     if task.kind.startswith("worktree"):
         git(workspace, "add", "-N", ".")
@@ -256,7 +284,6 @@ def run_cell(
     if not keep_workspaces:
         shutil.rmtree(workspace, ignore_errors=True)
 
-    agent_ok = execution["agent_status"] == "success"
     if infrastructure_error:
         status, failure_class = "invalid", "infrastructure"
     elif not agent_ok:

@@ -124,16 +124,13 @@ def metric(scores: JsonDict, name: str) -> float | None:
     return float(score["value"]) if score is not None else None
 
 
-def classifier_metrics(results: dict[str, JsonDict]) -> JsonDict:
-    """Aggregate deterministic classifier metrics across classifier cells."""
-    total_cells = 0
-    valid_cells = 0
+def summarize_classifier_cells(cells: list[JsonDict]) -> JsonDict:
+    """Aggregate deterministic classifier metrics over one group of scored cells."""
+    total_cells = len(cells)
     boolean: list[JsonDict] = []
     ranking: list[JsonDict] = []
-    for result in results.values():
-        if result["experiment"]["kind"] != "transform-classifier":
-            continue
-        total_cells += 1
+    valid_cells = 0
+    for result in cells:
         scores = result["outcome"]["scores"]
         if metric(scores, "schema_validity") != 1.0:
             continue
@@ -142,13 +139,11 @@ def classifier_metrics(results: dict[str, JsonDict]) -> JsonDict:
             boolean.append(scores)
         if "reciprocal_rank" in scores:
             ranking.append(scores)
-    if not total_cells:
-        return {}
 
     summary: JsonDict = {
         "total_cells": total_cells,
         "valid_cells": valid_cells,
-        "schema_validity_rate": round_score(valid_cells / total_cells),
+        "schema_validity_rate": round_score(valid_cells / total_cells) if total_cells else 0.0,
     }
 
     if boolean:
@@ -186,6 +181,78 @@ def classifier_metrics(results: dict[str, JsonDict]) -> JsonDict:
             name: round_score(sums[name] / counts[name]) for name in sorted(sums)
         }
     return summary
+
+
+def classifier_metrics(results: dict[str, JsonDict]) -> JsonDict:
+    """Pool the classifier cells, and break the same numbers out per agent.
+
+    An experiment whose independent variable is the agent instruction cannot
+    read a pooled number: the two instruction levels have to be comparable
+    side by side. The pooled summary stays for the single-agent case.
+
+    Cells the harness or the agent runtime failed carry no evidence about the
+    classifier contract, so they are excluded here rather than counted as
+    schema failures.
+    """
+    cells = [
+        result
+        for result in results.values()
+        if result["experiment"]["kind"] == "transform-classifier"
+    ]
+    if not cells:
+        return {}
+    scored = [result for result in cells if result["outcome"]["status"] != "invalid"]
+
+    # An experiment need not vary the agent at all, in which case its cells
+    # carry no agent level and there is nothing to break out: report the pooled
+    # summary alone rather than inventing a level or failing the reduce.
+    by_agent: dict[str, list[JsonDict]] = {}
+    for result in scored:
+        agent = result.get("variant", {}).get("agent")
+        if agent:
+            by_agent.setdefault(agent, []).append(result)
+
+    return summarize_classifier_cells(scored) | {
+        "excluded_invalid_cells": len(cells) - len(scored),
+        "by_agent": {
+            agent: summarize_classifier_cells(group) for agent, group in sorted(by_agent.items())
+        },
+    }
+
+
+def classifier_by_agent_lines(by_agent: JsonDict) -> list[str]:
+    """One row per agent level, so the agent axis can be read off the report."""
+    if not by_agent:
+        return []
+    names = sorted(
+        {
+            name
+            for group in by_agent.values()
+            for kind in ("boolean", "ranking")
+            for name in (group.get(kind) or {})
+            if name != "cells"
+        }
+    )
+    lines = [
+        "",
+        "### By agent",
+        "",
+        "| agent | cells | schema validity | " + " | ".join(names) + " |",
+        "| --- | ---: | ---: |" + " ---: |" * len(names),
+    ]
+    for agent, group in sorted(by_agent.items()):
+        row = [
+            agent,
+            str(group["total_cells"]),
+            f"{group['valid_cells']}/{group['total_cells']}",
+        ]
+        for name in names:
+            value = (group.get("boolean") or {}).get(name)
+            if value is None:
+                value = (group.get("ranking") or {}).get(name)
+            row.append("—" if value is None else f"{value:.6f}")
+        lines.append("| " + " | ".join(row) + " |")
+    return lines
 
 
 def markdown_report(
@@ -226,17 +293,20 @@ def markdown_report(
                 "",
                 f"Schema-valid cells: {classifier_summary['valid_cells']}/"
                 f"{classifier_summary['total_cells']} "
-                f"({classifier_summary['schema_validity_rate']:.0%}).",
+                f"({classifier_summary['schema_validity_rate']:.0%}). "
+                f"Excluded infrastructure and agent-execution failures: "
+                f"{classifier_summary.get('excluded_invalid_cells', 0)}.",
             ]
         )
         for kind in ("boolean", "ranking"):
             metrics = classifier_summary.get(kind)
             if not metrics:
                 continue
-            lines.extend(["", f"### {kind.title()}", "", "| metric | value |", "| --- | ---: |"])
+            lines.extend(["", f"### {kind.title()} (pooled)", "", "| metric | value |", "| --- | ---: |"])
             for name, metric_value in sorted(metrics.items()):
                 display = str(metric_value) if name == "cells" else f"{metric_value:.6f}"
                 lines.append(f"| {name} | {display} |")
+        lines.extend(classifier_by_agent_lines(classifier_summary.get("by_agent") or {}))
 
     for title, wins in (("Judge preferences", judge_wins), ("Human preferences", human_wins)):
         lines.extend(["", f"## {title}", ""])

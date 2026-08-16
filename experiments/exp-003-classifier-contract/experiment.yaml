@@ -35,7 +35,9 @@ judges:
 judging:
   mode: pairwise
   blinding: randomized-ab
-  inputs: [output, evaluator_summary]
+  # Output only. The evaluator summary is computed from the hidden expected
+  # label, so showing it to the judge would hand over the answer key.
+  inputs: [output]
 
 human:
   mode: pairwise

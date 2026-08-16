@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import Any
 
 from .pi import compile_schema, first_schema_error
+from .resources import read_schema
 
 JsonDict = dict[str, Any]
 
-SCHEMAS_DIR = Path(__file__).resolve().parents[2] / "schemas"
 SCORE_PRECISION = 12
 
 
@@ -22,8 +22,8 @@ class ClassifierError(RuntimeError):
 
 @lru_cache(maxsize=None)
 def _validator(schema_name: str) -> Any:
-    schema = json.loads((SCHEMAS_DIR / schema_name).read_text(encoding="utf-8"))
-    return compile_schema(schema)
+    """Compile one contract schema. Raises HarnessError if it cannot be read."""
+    return compile_schema(read_schema(schema_name))
 
 
 def _validate(document: Any, schema_name: str, label: str) -> JsonDict:

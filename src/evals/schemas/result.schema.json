@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-outfitter.dev/schemas/evals-result/v2",
+  "title": "Evals cell result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "cell_id", "spec_hash", "run", "experiment", "variant", "container", "execution", "outcome", "artifacts"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "cell_id": {"type": "string", "minLength": 1},
+    "spec_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin", "run_id", "source_sha", "collected_at"],
+      "properties": {
+        "origin": {"enum": ["local", "github", "forgejo"]},
+        "repository": {"type": ["string", "null"]},
+        "run_id": {"type": "string"},
+        "run_attempt": {"type": ["string", "null"]},
+        "source_sha": {"type": "string"},
+        "collected_at": {"type": "string"}
+      }
+    },
+    "experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "task_id", "repetition"],
+      "properties": {
+        "id": {"type": "string"},
+        "kind": {"type": "string"},
+        "task_id": {"type": "string"},
+        "repetition": {"type": "integer", "minimum": 1}
+      }
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["harness", "agent", "provider", "requested_model", "thinking"],
+      "properties": {
+        "harness": {"type": "string"},
+        "agent": {"type": "string"},
+        "provider": {"type": "string"},
+        "requested_model": {"type": "string"},
+        "thinking": {"type": "string"},
+        "agent_version": {"type": ["string", "null"]},
+        "outfitter_version": {"type": ["string", "null"]},
+        "tools": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "container": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image", "digest"],
+      "properties": {
+        "image": {"type": "string"},
+        "digest": {"type": ["string", "null"]},
+        "runtime": {"type": ["string", "null"]},
+        "network": {"type": ["string", "null"]}
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_status", "infrastructure_error", "session"],
+      "properties": {
+        "agent_status": {"enum": ["success", "error", "timeout"]},
+        "infrastructure_error": {"type": ["string", "null"]},
+        "exit_code": {"type": ["integer", "null"]},
+        "runtime": {"type": "object"},
+        "session": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "usage": {"type": "object"},
+            "response_models": {"type": "array", "items": {"type": "string"}},
+            "stop_reason": {"type": ["string", "null"]},
+            "wall_clock_seconds": {"type": "number"}
+          }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "failure_class", "scores"],
+      "properties": {
+        "status": {"enum": ["pass", "fail", "invalid", "unscored"]},
+        "failure_class": {"enum": ["none", "benchmark", "agent_execution", "infrastructure"]},
+        "scores": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "max"],
+            "properties": {
+              "value": {"type": "number"},
+              "max": {"type": "number"}
+            }
+          }
+        },
+        "evaluator_exit_code": {"type": ["integer", "null"]}
+      }
+    },
+    "artifacts": {"type": "array", "items": {"type": "string"}}
+  }
+}

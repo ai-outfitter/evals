@@ -6,6 +6,8 @@ The matrix fixes the model and the thinking level. It repeats each cell three ti
 
 The task supplies one evidence bundle to the agent. The task keeps the expected label in a separate file. The harness does not add that label to the agent prompt.
 
+The judge sees the output only. The evaluator summary is calculated from the expected label, so the judge does not receive it. This keeps the judge score independent of the deterministic score.
+
 The deterministic evaluator requires `classifier-result/v1`. It calculates accuracy, precision, recall, F1, and Brier score. It records invalid JSON or an invalid schema as a benchmark failure with `schema_validity=0`.
 
 Do not record a frozen baseline until these conditions are true:

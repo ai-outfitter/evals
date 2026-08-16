@@ -24,6 +24,7 @@ from .judge import run_judges
 from .matrix import apply_filters, expand_matrix, parse_filters, spec_hash
 from .prefer import run_preferences
 from .reduce import run_reduce
+from .resources import HarnessError
 from .spec import SpecError, load_experiment, run_paths
 
 
@@ -91,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return dispatch(args)
-    except (SpecError, ContainerError, BundleError, ClassifierError) as error:
+    except (SpecError, ContainerError, BundleError, ClassifierError, HarnessError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
 

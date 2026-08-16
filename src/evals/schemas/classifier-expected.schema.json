@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-outfitter.dev/schemas/classifier-expected-v1.schema.json",
+  "title": "ClassifierExpectedV1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "kind", "label"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "kind": {"const": "boolean"},
+        "label": {"type": "boolean"}
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "kind", "required_ids"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "kind": {"const": "ranking"},
+        "required_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string"}
+        },
+        "relevance_grades": {
+          "type": "object",
+          "additionalProperties": {"type": "number", "minimum": 0}
+        },
+        "binary_labels": {
+          "type": "object",
+          "additionalProperties": {"type": "boolean"}
+        }
+      }
+    }
+  ]
+}

@@ -9,6 +9,7 @@ from typing import Any
 
 from .classifier import ClassifierError, validate_classifier_expected
 from .pi import compile_schema, first_schema_error, load_yaml
+from .resources import read_schema
 
 JsonDict = dict[str, Any]
 
@@ -25,7 +26,11 @@ def find_repo_root(start: Path) -> Path:
 
 
 def load_schema(repo_root: Path, name: str) -> JsonDict:
-    return json.loads((repo_root / "schemas" / name).read_text(encoding="utf-8"))
+    """The checkout's own schema, falling back to the shared lookup."""
+    path = repo_root / "schemas" / name
+    if path.is_file():
+        return json.loads(path.read_text(encoding="utf-8"))
+    return read_schema(name)
 
 
 def validate_against(schema: JsonDict, document: Any, label: str) -> None:
