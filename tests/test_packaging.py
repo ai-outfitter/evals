@@ -2,7 +2,7 @@
 
 `score-classifier` is the one command a third party runs against its own
 results, from its own directory, with `evals` installed rather than checked
-out. These tests pin the three things that makes possible: the packaged copy
+out. These tests pin the three things that make this possible: the packaged copy
 matches the canonical root schemas, the wheel actually carries them, and an
 installed distribution scores a result from an unrelated working directory.
 """
@@ -40,6 +40,7 @@ def can_build_wheels() -> bool:
     try:
         import pip  # noqa: F401
         import setuptools  # noqa: F401
+        import wheel  # noqa: F401
     except ImportError:
         return False
     return True
@@ -74,7 +75,7 @@ class PackagedSchemaCopyTests(unittest.TestCase):
         self.assertEqual(resolved.parent, PACKAGED_SCHEMAS.resolve())
 
 
-@unittest.skipUnless(can_build_wheels(), "needs pip and setuptools (nix develop)")
+@unittest.skipUnless(can_build_wheels(), "needs pip, setuptools, and wheel (nix develop)")
 class InstalledDistributionTests(unittest.TestCase):
     """Build a wheel, install it away from the checkout, and score with it."""
 

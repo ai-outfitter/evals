@@ -74,11 +74,14 @@ def validate_classifier_expected(document: Any) -> JsonDict:
         if isinstance(grades, dict) and any(
             isinstance(grade, (int, float))
             and not isinstance(grade, bool)
-            and not (math.isfinite(float(grade)) and float(grade) <= MAX_RELEVANCE_GRADE)
+            and not (
+                math.isfinite(float(grade))
+                and 0 <= float(grade) <= MAX_RELEVANCE_GRADE
+            )
             for grade in grades.values()
         ):
             raise ClassifierError(
-                "classifier expected label: relevance grades must be finite and at most "
+                "classifier expected label: relevance grades must be finite and from 0 through "
                 f"{MAX_RELEVANCE_GRADE}"
             )
     return _validate(document, "classifier-expected.schema.json", "classifier expected label")

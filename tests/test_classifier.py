@@ -121,7 +121,7 @@ class ClassifierSchemaTests(unittest.TestCase):
             "required_ids": ["a"],
             "relevance_grades": {"a": -1},
         }
-        with self.assertRaises(ClassifierError):
+        with self.assertRaisesRegex(ClassifierError, "finite and from 0 through 1000"):
             validate_classifier_expected(expected)
 
     def test_expected_contract_accepts_the_maximum_relevance_grade(self):
@@ -143,7 +143,7 @@ class ClassifierSchemaTests(unittest.TestCase):
             "required_ids": ["a"],
             "relevance_grades": {"a": MAX_RELEVANCE_GRADE + 1},
         }
-        with self.assertRaisesRegex(ClassifierError, "finite and at most 1000"):
+        with self.assertRaisesRegex(ClassifierError, "finite and from 0 through 1000"):
             validate_classifier_expected(expected)
 
     def test_expected_contract_rejects_an_infinite_relevance_grade(self):
@@ -154,7 +154,7 @@ class ClassifierSchemaTests(unittest.TestCase):
             ' "relevance_grades": {"a": Infinity}}'
         )
         self.assertTrue(math.isinf(expected["relevance_grades"]["a"]))
-        with self.assertRaisesRegex(ClassifierError, "finite and at most 1000"):
+        with self.assertRaisesRegex(ClassifierError, "finite and from 0 through 1000"):
             validate_classifier_expected(expected)
 
     def test_expected_contract_rejects_a_not_a_number_relevance_grade(self):
@@ -165,7 +165,7 @@ class ClassifierSchemaTests(unittest.TestCase):
             ' "relevance_grades": {"a": NaN}}'
         )
         self.assertTrue(math.isnan(expected["relevance_grades"]["a"]))
-        with self.assertRaisesRegex(ClassifierError, "finite and at most 1000"):
+        with self.assertRaisesRegex(ClassifierError, "finite and from 0 through 1000"):
             validate_classifier_expected(expected)
 
     def test_schema_maximum_matches_the_relevance_grade_constant(self):
