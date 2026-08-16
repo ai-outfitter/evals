@@ -38,6 +38,20 @@ def load_yaml(text: str) -> Any:
     return yaml.load(text, Loader=EvalsLoader)
 
 
+def compile_schema(schema: JsonDict) -> Any:
+    return validator_for(schema)(schema)
+
+
+def first_schema_error(validator: Any, document: Any) -> str | None:
+    """Return `<path>: <message>` for the outermost schema error, or None."""
+    errors = sorted(validator.iter_errors(document), key=lambda e: list(e.absolute_path))
+    if not errors:
+        return None
+    first = errors[0]
+    path = ".".join(str(part) for part in first.absolute_path) or "<root>"
+    return f"{path}: {first.message}"
+
+
 def build_pi_command(
     *,
     provider: str,
@@ -167,8 +181,7 @@ def validate_json_schema_output(chat_history: list[JsonDict], schema: JsonDict) 
     except json.JSONDecodeError as exc:
         return {"valid": False, "error": f"response was not valid JSON: {exc.msg}"}
 
-    validator = validator_for(schema)(schema)
-    error = next(validator.iter_errors(parsed), None)
+    error = next(compile_schema(schema).iter_errors(parsed), None)
     if error is not None:
         return {
             "valid": False,

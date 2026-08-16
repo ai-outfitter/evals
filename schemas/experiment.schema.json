@@ -24,6 +24,12 @@
       }
     },
     "providers": {"type": "string", "description": "Relative path to the provider registry (models.yaml)"},
+    "agents": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "string"},
+      "description": "Optional map from matrix agent labels to instruction files"
+    },
     "matrix": {
       "type": "object",
       "additionalProperties": false,

@@ -1,0 +1,13 @@
+{
+  "claim": "The instrument entered safe mode during the test window.",
+  "evidence": [
+    {
+      "id": "event-log:17",
+      "text": "14:32:08 SAFE_MODE entered after voltage threshold warning."
+    },
+    {
+      "id": "operator-note:4",
+      "text": "The test window ended at 14:40."
+    }
+  ]
+}

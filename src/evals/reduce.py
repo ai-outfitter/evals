@@ -7,6 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from .classifier import precision_recall_f1, round_score
 from .spec import Experiment, RunPaths
 
 JsonDict = dict[str, Any]
@@ -118,12 +119,153 @@ def win_rate(counts: JsonDict) -> str:
     return f"{counts['win']}/{decided} ({counts['win'] / decided:.0%})"
 
 
+def metric(scores: JsonDict, name: str) -> float | None:
+    score = scores.get(name)
+    return float(score["value"]) if score is not None else None
+
+
+def summarize_classifier_cells(cells: list[JsonDict]) -> JsonDict:
+    """Aggregate deterministic classifier metrics over one group of scored cells."""
+    total_cells = len(cells)
+    boolean: list[JsonDict] = []
+    ranking: list[JsonDict] = []
+    valid_cells = 0
+    for result in cells:
+        scores = result["outcome"]["scores"]
+        if metric(scores, "schema_validity") != 1.0:
+            continue
+        valid_cells += 1
+        if "accuracy" in scores:
+            boolean.append(scores)
+        if "reciprocal_rank" in scores:
+            ranking.append(scores)
+
+    summary: JsonDict = {
+        "total_cells": total_cells,
+        "valid_cells": valid_cells,
+        "schema_validity_rate": round_score(valid_cells / total_cells) if total_cells else 0.0,
+    }
+
+    if boolean:
+        totals = dict.fromkeys(
+            ("true_positive", "false_positive", "false_negative", "true_negative", "brier"), 0.0
+        )
+        for scores in boolean:
+            for name in totals:
+                totals[name] += metric(scores, name) or 0.0
+        precision, recall, f1 = precision_recall_f1(
+            totals["true_positive"], totals["false_positive"], totals["false_negative"]
+        )
+        correct = totals["true_positive"] + totals["true_negative"]
+        summary["boolean"] = {
+            "cells": len(boolean),
+            "accuracy": round_score(correct / len(boolean)),
+            "precision": round_score(precision),
+            "recall": round_score(recall),
+            "f1": round_score(f1),
+            "brier": round_score(totals["brier"] / len(boolean)),
+        }
+
+    if ranking:
+        # Average every score the ranking scorer emits, so a new metric needs no
+        # matching edit here; schema_validity is reported once above instead.
+        sums: dict[str, float] = {}
+        counts: dict[str, int] = {}
+        for scores in ranking:
+            for name, score in scores.items():
+                if name == "schema_validity":
+                    continue
+                sums[name] = sums.get(name, 0.0) + float(score["value"])
+                counts[name] = counts.get(name, 0) + 1
+        summary["ranking"] = {"cells": len(ranking)} | {
+            name: round_score(sums[name] / counts[name]) for name in sorted(sums)
+        }
+    return summary
+
+
+def classifier_metrics(results: dict[str, JsonDict]) -> JsonDict:
+    """Pool the classifier cells, and break the same numbers out per agent.
+
+    An experiment whose independent variable is the agent instruction cannot
+    read a pooled number: the two instruction levels have to be comparable
+    side by side. The pooled summary stays for the single-agent case.
+
+    Cells the harness or the agent runtime failed carry no evidence about the
+    classifier contract, so they are excluded here rather than counted as
+    schema failures.
+    """
+    cells = [
+        result
+        for result in results.values()
+        if result["experiment"]["kind"] == "transform-classifier"
+    ]
+    if not cells:
+        return {}
+    scored = [result for result in cells if result["outcome"]["status"] != "invalid"]
+
+    # An experiment need not vary the agent at all, in which case its cells
+    # carry no agent level and there is nothing to break out: report the pooled
+    # summary alone rather than inventing a level or failing the reduce.
+    by_agent: dict[str, list[JsonDict]] = {}
+    for result in scored:
+        agent = result.get("variant", {}).get("agent")
+        if agent:
+            by_agent.setdefault(agent, []).append(result)
+
+    return summarize_classifier_cells(scored) | {
+        "excluded_invalid_cells": len(cells) - len(scored),
+        "by_agent": {
+            agent: summarize_classifier_cells(group) for agent, group in sorted(by_agent.items())
+        },
+    }
+
+
+def classifier_by_agent_lines(by_agent: JsonDict) -> list[str]:
+    """One row per agent level, so the agent axis can be read off the report."""
+    if not by_agent:
+        return []
+    names = sorted(
+        {
+            name
+            for group in by_agent.values()
+            for kind in ("boolean", "ranking")
+            for name in (group.get(kind) or {})
+            if name != "cells"
+        }
+    )
+    # A group whose every cell failed the contract has no metric names at all,
+    # so the delimiter row has to follow the columns actually emitted rather
+    # than assume the three fixed ones plus a non-empty tail.
+    columns = ["agent", "cells", "schema validity", *names]
+    lines = [
+        "",
+        "### By agent",
+        "",
+        "| " + " | ".join(columns) + " |",
+        "| --- |" + " ---: |" * (len(columns) - 1),
+    ]
+    for agent, group in sorted(by_agent.items()):
+        row = [
+            agent,
+            str(group["total_cells"]),
+            f"{group['valid_cells']}/{group['total_cells']}",
+        ]
+        for name in names:
+            value = (group.get("boolean") or {}).get(name)
+            if value is None:
+                value = (group.get("ranking") or {}).get(name)
+            row.append("—" if value is None else f"{value:.6f}")
+        lines.append("| " + " | ".join(row) + " |")
+    return lines
+
+
 def markdown_report(
     experiment: Experiment,
     results: dict[str, JsonDict],
     judge_wins: JsonDict,
     human_wins: JsonDict,
     judge_agreement: JsonDict,
+    classifier_summary: JsonDict,
 ) -> str:
     lines = [
         f"# {experiment.id}",
@@ -146,6 +288,29 @@ def markdown_report(
             f"| {scores} | {session.get('wall_clock_seconds', 0):.0f} "
             f"| {session.get('usage', {}).get('output', 0)} |"
         )
+
+    if classifier_summary:
+        lines.extend(
+            [
+                "",
+                "## Classifier metrics",
+                "",
+                f"Schema-valid cells: {classifier_summary['valid_cells']}/"
+                f"{classifier_summary['total_cells']} "
+                f"({classifier_summary['schema_validity_rate']:.0%}). "
+                f"Excluded infrastructure and agent-execution failures: "
+                f"{classifier_summary.get('excluded_invalid_cells', 0)}.",
+            ]
+        )
+        for kind in ("boolean", "ranking"):
+            metrics = classifier_summary.get(kind)
+            if not metrics:
+                continue
+            lines.extend(["", f"### {kind.title()} (pooled)", "", "| metric | value |", "| --- | ---: |"])
+            for name, metric_value in sorted(metrics.items()):
+                display = str(metric_value) if name == "cells" else f"{metric_value:.6f}"
+                lines.append(f"| {name} | {display} |")
+        lines.extend(classifier_by_agent_lines(classifier_summary.get("by_agent") or {}))
 
     for title, wins in (("Judge preferences", judge_wins), ("Human preferences", human_wins)):
         lines.extend(["", f"## {title}", ""])
@@ -191,6 +356,7 @@ def run_reduce(experiment: Experiment, paths: RunPaths) -> JsonDict:
     judge_wins = tally_pairwise(verdicts, results)
     human_wins = tally_pairwise(preferences, results)
     judge_agreement = agreement(verdicts, preferences)
+    classifier_summary = classifier_metrics(results)
 
     summary = {
         "experiment_id": experiment.id,
@@ -207,12 +373,20 @@ def run_reduce(experiment: Experiment, paths: RunPaths) -> JsonDict:
         "judge_wins": judge_wins,
         "human_wins": human_wins,
         "judge_agreement": judge_agreement,
+        "classifier_metrics": classifier_summary,
     }
     (paths.root / "results.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     (paths.root / "report.md").write_text(
-        markdown_report(experiment, results, judge_wins, human_wins, judge_agreement),
+        markdown_report(
+            experiment,
+            results,
+            judge_wins,
+            human_wins,
+            judge_agreement,
+            classifier_summary,
+        ),
         encoding="utf-8",
     )
     return summary

@@ -10,9 +10,16 @@ from pathlib import Path
 from typing import Any
 
 from . import SCHEMA_VERSION
+from .classifier import (
+    ClassifierError,
+    invalid_summary,
+    score_classifier_result,
+    validate_classifier_expected,
+)
 from .container import AgentRunner, AgentRunRequest
 from .matrix import Cell, spec_hash
 from .pi import final_assistant_text, utc_now
+from .resources import HarnessError
 from .spec import Experiment, RunPaths, load_schema, validate_against
 
 JsonDict = dict[str, Any]
@@ -54,15 +61,21 @@ def source_sha(repo_root: Path) -> str:
     return completed.stdout.strip() if completed.returncode == 0 else "unknown"
 
 
-def build_cell_prompt(experiment: Experiment, workspace_input: Path | None) -> tuple[str, bool]:
+def build_cell_prompt(experiment: Experiment, cell: Cell) -> tuple[str, bool]:
     """Return (prompt, no_tools) for the task kind."""
     task = experiment.task
     if task.kind.startswith("transform"):
         assert task.input is not None
         input_text = task.input.read_text(encoding="utf-8", errors="replace")
         prompt = f"{task.prompt}\n\n---\nINPUT:\n{input_text}"
-        return prompt, True
-    return task.prompt, False
+        no_tools = True
+    else:
+        prompt = task.prompt
+        no_tools = False
+    agent_instruction = experiment.agent_instructions.get(cell.agent)
+    if agent_instruction:
+        prompt = f"AGENT INSTRUCTIONS:\n{agent_instruction.strip()}\n\nTASK:\n{prompt}"
+    return prompt, no_tools
 
 
 def run_evaluator(experiment: Experiment, worktree: Path, cell_dir: Path) -> JsonDict:
@@ -94,11 +107,45 @@ def run_evaluator(experiment: Experiment, worktree: Path, cell_dir: Path) -> Jso
         if not isinstance(summary.get("scores"), dict) or "pass" not in summary:
             raise CellError("evaluator JSON must contain scores mapping and pass boolean")
 
-    summary["exit_code"] = completed.returncode
+    return write_evaluator_summary(cell_dir, summary, completed.returncode)
+
+
+def write_evaluator_summary(cell_dir: Path, summary: JsonDict, exit_code: int) -> JsonDict:
+    """Stamp the exit code and write the one evaluator.json format bundles read."""
+    summary["exit_code"] = exit_code
     (cell_dir / "evaluator.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     return summary
+
+
+def run_classifier_evaluator(experiment: Experiment, output_text: str, cell_dir: Path) -> JsonDict:
+    """Score a strict JSON classifier response against a hidden label file.
+
+    Only the model's own output can fail the benchmark here. A hidden label
+    file the harness cannot read or validate, and a contract schema it cannot
+    find, are the harness's fault: they raise CellError so the cell records an
+    infrastructure failure instead of charging the candidate for it.
+    """
+    task = experiment.task
+    assert task.expected is not None
+    try:
+        expected = validate_classifier_expected(
+            json.loads(task.expected.read_text(encoding="utf-8"))
+        )
+    except (OSError, json.JSONDecodeError, ClassifierError, HarnessError) as error:
+        raise CellError(f"cannot use expected label {task.expected}: {error}") from error
+
+    try:
+        summary = score_classifier_result(json.loads(output_text), expected)
+        log = "classifier result is valid\n"
+    except HarnessError as error:
+        raise CellError(str(error)) from error
+    except (json.JSONDecodeError, ClassifierError) as error:
+        summary = invalid_summary(str(error))
+        log = f"classifier result is invalid: {error}\n"
+    (cell_dir / "evaluator.log").write_text(log, encoding="utf-8")
+    return write_evaluator_summary(cell_dir, summary, 0 if summary["pass"] else 1)
 
 
 def run_cell(
@@ -143,7 +190,7 @@ def run_cell(
         encoding="utf-8",
     )
 
-    prompt, no_tools = build_cell_prompt(experiment, None)
+    prompt, no_tools = build_cell_prompt(experiment, cell)
 
     env: dict[str, str] = {}
     if provider.api_key_env:
@@ -193,6 +240,21 @@ def run_cell(
     output_text = final_assistant_text(execution["chat_history"])
     (cell_dir / "output.md").write_text(output_text + "\n", encoding="utf-8")
 
+    agent_ok = execution["agent_status"] == "success"
+
+    # A cell whose agent never finished has no result to hold against the
+    # contract: scoring its empty output would record a schema failure the
+    # model did not commit.
+    if task.kind == "transform-classifier" and infrastructure_error is None and agent_ok:
+        try:
+            evaluator_summary = run_classifier_evaluator(experiment, output_text, cell_dir)
+        except (CellError, HarnessError) as error:
+            infrastructure_error = str(error)
+        else:
+            scores = evaluator_summary["scores"]
+            evaluator_exit = evaluator_summary["exit_code"]
+            artifacts.extend(["evaluator.json", "evaluator.log"])
+
     if task.kind.startswith("worktree"):
         git(workspace, "add", "-N", ".")
         patch = git(workspace, "diff", "--binary", "HEAD", "--")
@@ -222,7 +284,6 @@ def run_cell(
     if not keep_workspaces:
         shutil.rmtree(workspace, ignore_errors=True)
 
-    agent_ok = execution["agent_status"] == "success"
     if infrastructure_error:
         status, failure_class = "invalid", "infrastructure"
     elif not agent_ok:
@@ -287,7 +348,7 @@ def run_cell(
         "artifacts": sorted(artifacts),
     }
     validate_against(
-        load_schema(experiment.repo_root, "result.schema.json"), result, f"result {cell.cell_id}"
+        load_schema("result.schema.json"), result, f"result {cell.cell_id}"
     )
     result_path.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 

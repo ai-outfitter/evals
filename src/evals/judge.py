@@ -149,7 +149,7 @@ def run_judges(
 ) -> list[JsonDict]:
     usable = judgeable_cells(experiment, paths, cells)
     pairs = comparison_pairs(usable, experiment.independent_variables)
-    verdict_schema = load_schema(experiment.repo_root, "judge-verdict.schema.json")
+    verdict_schema = load_schema("judge-verdict.schema.json")
     records: list[JsonDict] = []
 
     for judge in experiment.judges:

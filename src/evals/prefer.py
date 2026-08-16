@@ -48,7 +48,7 @@ def run_preferences(
 ) -> list[JsonDict]:
     usable = judgeable_cells(experiment, paths, cells)
     pairs = comparison_pairs(usable, experiment.independent_variables)
-    schema = load_schema(experiment.repo_root, "preference.schema.json")
+    schema = load_schema("preference.schema.json")
     paths.preferences.mkdir(parents=True, exist_ok=True)
     metrics = experiment.human_metrics
     records: list[JsonDict] = []

@@ -9,3 +9,6 @@ reduced-report/
 runs/
 result
 result-*
+dist/
+build/
+*.egg-info/

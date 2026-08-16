@@ -12,7 +12,16 @@
         "aarch64-darwin"
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
-      pythonFor = pkgs: pkgs.python3.withPackages (ps: [ ps.pyyaml ps.jsonschema ]);
+      # pip/setuptools/wheel are here for the packaging test: it builds a wheel
+      # from this tree and installs it, so `evals` has to be buildable in the
+      # dev shell, not just importable from src/.
+      pythonFor = pkgs: pkgs.python3.withPackages (ps: [
+        ps.pyyaml
+        ps.jsonschema
+        ps.pip
+        ps.setuptools
+        ps.wheel
+      ]);
     in {
       devShells = forAllSystems (system:
         let pkgs = import nixpkgs { inherit system; };

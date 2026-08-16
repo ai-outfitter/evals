@@ -14,3 +14,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# The JSON Schemas are part of the contract the harness enforces, so an
+# installed wheel has to carry them. `src/evals/schemas/` is a copy of the
+# canonical root `schemas/`; tests/test_packaging.py fails if the two drift.
+[tool.setuptools.package-data]
+evals = ["schemas/*.json"]

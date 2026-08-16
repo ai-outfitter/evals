@@ -7,9 +7,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from jsonschema.validators import validator_for
-
-from .pi import load_yaml
+from .classifier import ClassifierError, validate_classifier_expected
+from .pi import compile_schema, first_schema_error, load_yaml
+from .resources import read_schema
 
 JsonDict = dict[str, Any]
 
@@ -25,17 +25,23 @@ def find_repo_root(start: Path) -> Path:
     raise SpecError(f"could not locate repo root (schemas/) above {start}")
 
 
-def load_schema(repo_root: Path, name: str) -> JsonDict:
-    return json.loads((repo_root / "schemas" / name).read_text(encoding="utf-8"))
+def load_schema(name: str) -> JsonDict:
+    """One schema lookup for the whole harness.
+
+    Spec validation and classifier validation used to disagree about which
+    copy wins — spec preferred the checkout's `schemas/`, the classifier
+    preferred the packaged one — so the same document could validate
+    differently depending on which path reached it. Both now go through
+    `resources.read_schema`, and tests/test_packaging.py keeps the two copies
+    byte-identical so the single precedence never hides a difference.
+    """
+    return read_schema(name)
 
 
 def validate_against(schema: JsonDict, document: Any, label: str) -> None:
-    validator = validator_for(schema)(schema)
-    errors = sorted(validator.iter_errors(document), key=lambda e: list(e.absolute_path))
-    if errors:
-        first = errors[0]
-        path = ".".join(str(part) for part in first.absolute_path) or "<root>"
-        raise SpecError(f"{label}: {path}: {first.message}")
+    detail = first_schema_error(compile_schema(schema), document)
+    if detail is not None:
+        raise SpecError(f"{label}: {detail}")
 
 
 def contained(path: Path, repo_root: Path, label: str) -> Path:
@@ -169,6 +175,7 @@ class Task:
     metrics: list[str]
     fixture: Path | None
     input: Path | None
+    expected: Path | None
     evaluator: Path | None
     evaluator_format: str
 
@@ -201,6 +208,7 @@ class Experiment:
     registry: ProviderRegistry
     task: Task
     judges: list[Judge]
+    agent_instructions: dict[str, str]
 
     @property
     def id(self) -> str:
@@ -238,7 +246,7 @@ class Experiment:
 
 def load_task(path: Path, repo_root: Path) -> Task:
     document = load_yaml_file(path, "task spec")
-    validate_against(load_schema(repo_root, "task.schema.json"), document, f"task spec {path}")
+    validate_against(load_schema("task.schema.json"), document, f"task spec {path}")
 
     def resolve(name: str) -> Path | None:
         value = document.get(name)
@@ -259,6 +267,7 @@ def load_task(path: Path, repo_root: Path) -> Task:
         metrics=[str(m) for m in document["metrics"]],
         fixture=resolve("fixture"),
         input=resolve("input"),
+        expected=resolve("expected"),
         evaluator=resolve("evaluator"),
         evaluator_format=str(document.get("evaluator_format", "json")),
     )
@@ -286,7 +295,7 @@ def load_experiment(path: Path) -> Experiment:
     contained(path, repo_root, "experiment")
     document = load_yaml_file(path, "experiment spec")
     validate_against(
-        load_schema(repo_root, "experiment.schema.json"), document, f"experiment {path}"
+        load_schema("experiment.schema.json"), document, f"experiment {path}"
     )
 
     registry = load_provider_registry(
@@ -294,10 +303,40 @@ def load_experiment(path: Path) -> Experiment:
     )
     task = load_task(contained(path.parent / str(document["task"]), repo_root, "task"), repo_root)
 
+    agent_instructions: dict[str, str] = {}
+    for agent, instruction_path in document.get("agents", {}).items():
+        resolved = contained(path.parent / str(instruction_path), repo_root, f"agent {agent}")
+        if not resolved.is_file():
+            raise SpecError(f"agent {agent} instructions not found: {resolved}")
+        agent_instructions[str(agent)] = resolved.read_text(encoding="utf-8")
+    missing_agents = [
+        str(agent) for agent in document["matrix"]["agent"] if str(agent) not in agent_instructions
+    ]
+    if agent_instructions and missing_agents:
+        raise SpecError(f"agents mapping lacks matrix agents: {missing_agents}")
+
     if task.kind.startswith("worktree") and task.fixture is None:
         raise SpecError(f"task {task.id}: worktree kinds require a fixture")
     if task.kind.startswith("transform") and task.input is None:
         raise SpecError(f"task {task.id}: transform kinds require an input")
+    if task.kind == "transform-classifier":
+        # task.schema.json already requires `expected` for this kind.
+        assert task.expected is not None
+        try:
+            expected = json.loads(task.expected.read_text(encoding="utf-8"))
+            validate_classifier_expected(expected)
+        except (OSError, json.JSONDecodeError, ClassifierError) as error:
+            raise SpecError(f"task {task.id}: invalid expected label: {error}") from error
+        # The evaluator summary is derived from the hidden expected label, so
+        # showing it to a judge hands over the answer key and makes the judge
+        # score a restatement of the deterministic one. A comment cannot stop
+        # that, so the spec refuses to load instead.
+        if "evaluator_summary" in [str(v) for v in document["judging"]["inputs"]]:
+            raise SpecError(
+                f"task {task.id}: transform-classifier experiments must not put "
+                "evaluator_summary in judging.inputs: it is computed from the "
+                "hidden expected label"
+            )
 
     judges = []
     for raw in document["judges"]:
@@ -322,6 +361,7 @@ def load_experiment(path: Path) -> Experiment:
         registry=registry,
         task=task,
         judges=judges,
+        agent_instructions=agent_instructions,
     )
 
     for model_ref in experiment.matrix["model"]:
