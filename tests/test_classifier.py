@@ -181,6 +181,25 @@ class ClassifierScoringTests(unittest.TestCase):
         self.assertAlmostEqual(result["scores"]["soft_score"]["value"], 0.8)
         self.assertEqual(result["k"], 20)
 
+    def test_ranking_brier_uses_all_returned_labeled_items(self):
+        result_value = {
+            "schema_version": 1,
+            "kind": "ranking",
+            "items": [
+                {"id": "a", "score": 1.0, "confidence": 1.0, "evidence_refs": []},
+                {"id": "b", "score": 0.5, "confidence": 0.0, "evidence_refs": []},
+            ],
+        }
+        expected = {
+            "schema_version": 1,
+            "kind": "ranking",
+            "required_ids": ["a"],
+            "binary_labels": {"a": True, "b": True},
+        }
+        result = score_classifier_result(result_value, expected, k=1)
+        self.assertEqual(result["scores"]["brier"]["value"], 0.5)
+        self.assertEqual(result["scores"]["soft_score"]["value"], 0.9)
+
     def test_hard_pass_requires_every_required_id_in_top_k(self):
         expected = {
             "schema_version": 1,

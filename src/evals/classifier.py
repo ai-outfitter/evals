@@ -134,7 +134,7 @@ def _ranking_scores(result: JsonDict, expected: JsonDict, k: int) -> JsonDict:
     brier: float | None = None
     calibration = 0.0
     if labels is not None:
-        labeled_items = [item for item in result["items"][:k] if item["id"] in labels]
+        labeled_items = [item for item in result["items"] if item["id"] in labels]
         if labeled_items:
             brier = sum(
                 (float(item["confidence"]) - float(labels[item["id"]])) ** 2
