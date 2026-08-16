@@ -422,6 +422,24 @@ class ClassifierSuccessPathTests(unittest.TestCase):
         self.assertEqual(printed["kind"], "boolean")
         self.assertEqual(printed["scores"]["accuracy"]["value"], 1.0)
 
+    def test_score_classifier_prints_a_failed_summary_and_exits_one(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / "result.json").write_text(json.dumps(VALID_RESULT), encoding="utf-8")
+            (root / "expected.json").write_text(
+                json.dumps({"schema_version": 1, "kind": "boolean", "label": False}),
+                encoding="utf-8",
+            )
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = main(
+                    ["score-classifier", str(root / "result.json"), str(root / "expected.json")]
+                )
+        self.assertEqual(code, 1)
+        printed = json.loads(stdout.getvalue())
+        self.assertFalse(printed["pass"])
+        self.assertEqual(printed["scores"]["accuracy"]["value"], 0.0)
+
 
 class ClassifierFailureClassTests(unittest.TestCase):
     """Only the model's own output may fail the benchmark."""

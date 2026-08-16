@@ -108,7 +108,8 @@ class InstalledDistributionTests(unittest.TestCase):
             capture_output=True,
         )
         wheels = sorted(cls.wheel_dir.glob("evals-*.whl"))
-        assert len(wheels) == 1, f"expected one wheel, got {wheels}"
+        if len(wheels) != 1:
+            raise RuntimeError(f"expected one wheel, got {wheels}")
         cls.wheel = wheels[0]
 
         cls.target = root / "target"

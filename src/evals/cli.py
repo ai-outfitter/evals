@@ -99,8 +99,9 @@ def main(argv: list[str] | None = None) -> int:
 
 def dispatch(args: argparse.Namespace) -> int:
     if args.command == "score-classifier":
-        print(json.dumps(load_and_score(args.result, args.expected, k=args.k), sort_keys=True))
-        return 0
+        summary = load_and_score(args.result, args.expected, k=args.k)
+        print(json.dumps(summary, sort_keys=True))
+        return 0 if summary["pass"] else 1
 
     experiment = load_experiment(args.experiment)
 
