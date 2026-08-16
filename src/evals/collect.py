@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from . import SCHEMA_VERSION
+from .classifier import ClassifierError, score_classifier_result
 from .container import AgentRunner, AgentRunRequest
 from .matrix import Cell, spec_hash
 from .pi import final_assistant_text, utc_now
@@ -54,15 +55,23 @@ def source_sha(repo_root: Path) -> str:
     return completed.stdout.strip() if completed.returncode == 0 else "unknown"
 
 
-def build_cell_prompt(experiment: Experiment, workspace_input: Path | None) -> tuple[str, bool]:
+def build_cell_prompt(
+    experiment: Experiment, cell: Cell, workspace_input: Path | None
+) -> tuple[str, bool]:
     """Return (prompt, no_tools) for the task kind."""
     task = experiment.task
     if task.kind.startswith("transform"):
         assert task.input is not None
         input_text = task.input.read_text(encoding="utf-8", errors="replace")
         prompt = f"{task.prompt}\n\n---\nINPUT:\n{input_text}"
-        return prompt, True
-    return task.prompt, False
+        no_tools = True
+    else:
+        prompt = task.prompt
+        no_tools = False
+    agent_instruction = experiment.agent_instructions.get(cell.agent)
+    if agent_instruction:
+        prompt = f"AGENT INSTRUCTIONS:\n{agent_instruction.strip()}\n\nTASK:\n{prompt}"
+    return prompt, no_tools
 
 
 def run_evaluator(experiment: Experiment, worktree: Path, cell_dir: Path) -> JsonDict:
@@ -95,6 +104,33 @@ def run_evaluator(experiment: Experiment, worktree: Path, cell_dir: Path) -> Jso
             raise CellError("evaluator JSON must contain scores mapping and pass boolean")
 
     summary["exit_code"] = completed.returncode
+    (cell_dir / "evaluator.json").write_text(
+        json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return summary
+
+
+def run_classifier_evaluator(experiment: Experiment, output_text: str, cell_dir: Path) -> JsonDict:
+    """Score a strict JSON classifier response against a hidden label file."""
+    task = experiment.task
+    assert task.expected is not None
+    try:
+        result = json.loads(output_text)
+        expected = json.loads(task.expected.read_text(encoding="utf-8"))
+        summary = score_classifier_result(result, expected)
+        log = "classifier result is valid\n"
+    except (json.JSONDecodeError, OSError, ClassifierError) as error:
+        summary = {
+            "schema_version": 1,
+            "kind": "invalid",
+            "pass": False,
+            "k": None,
+            "scores": {"schema_validity": {"value": 0.0, "max": 1.0}},
+            "error": str(error),
+        }
+        log = f"classifier result is invalid: {error}\n"
+    summary["exit_code"] = 0 if summary["pass"] else 1
+    (cell_dir / "evaluator.log").write_text(log, encoding="utf-8")
     (cell_dir / "evaluator.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -143,7 +179,7 @@ def run_cell(
         encoding="utf-8",
     )
 
-    prompt, no_tools = build_cell_prompt(experiment, None)
+    prompt, no_tools = build_cell_prompt(experiment, cell, None)
 
     env: dict[str, str] = {}
     if provider.api_key_env:
@@ -192,6 +228,12 @@ def run_cell(
 
     output_text = final_assistant_text(execution["chat_history"])
     (cell_dir / "output.md").write_text(output_text + "\n", encoding="utf-8")
+
+    if task.kind == "transform-classifier" and infrastructure_error is None:
+        evaluator_summary = run_classifier_evaluator(experiment, output_text, cell_dir)
+        scores = evaluator_summary["scores"]
+        evaluator_exit = evaluator_summary["exit_code"]
+        artifacts.extend(["evaluator.json", "evaluator.log"])
 
     if task.kind.startswith("worktree"):
         git(workspace, "add", "-N", ".")

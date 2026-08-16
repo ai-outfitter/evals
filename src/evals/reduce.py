@@ -118,12 +118,75 @@ def win_rate(counts: JsonDict) -> str:
     return f"{counts['win']}/{decided} ({counts['win'] / decided:.0%})"
 
 
+def classifier_metrics(results: dict[str, JsonDict]) -> JsonDict:
+    """Aggregate deterministic classifier metrics across classifier cells."""
+    classifier_results = [
+        result
+        for result in results.values()
+        if result["experiment"]["kind"] == "transform-classifier"
+    ]
+    if not classifier_results:
+        return {}
+
+    def value(result: JsonDict, name: str) -> float | None:
+        score = result["outcome"]["scores"].get(name)
+        return float(score["value"]) if score is not None else None
+
+    valid = [result for result in classifier_results if value(result, "schema_validity") == 1.0]
+    boolean = [result for result in valid if value(result, "accuracy") is not None]
+    ranking = [result for result in valid if value(result, "reciprocal_rank") is not None]
+    summary: JsonDict = {
+        "total_cells": len(classifier_results),
+        "valid_cells": len(valid),
+        "schema_validity_rate": round(len(valid) / len(classifier_results), 12),
+    }
+
+    if boolean:
+        true_positive = sum(value(result, "true_positive") or 0.0 for result in boolean)
+        false_positive = sum(value(result, "false_positive") or 0.0 for result in boolean)
+        false_negative = sum(value(result, "false_negative") or 0.0 for result in boolean)
+        true_negative = sum(value(result, "true_negative") or 0.0 for result in boolean)
+        precision = true_positive / (true_positive + false_positive) if true_positive + false_positive else 0.0
+        recall = true_positive / (true_positive + false_negative) if true_positive + false_negative else 0.0
+        summary["boolean"] = {
+            "cells": len(boolean),
+            "accuracy": round((true_positive + true_negative) / len(boolean), 12),
+            "precision": round(precision, 12),
+            "recall": round(recall, 12),
+            "f1": round(2 * precision * recall / (precision + recall), 12)
+            if precision + recall
+            else 0.0,
+            "brier": round(
+                sum(value(result, "brier") or 0.0 for result in boolean) / len(boolean), 12
+            ),
+        }
+
+    if ranking:
+        metric_names = sorted(
+            {
+                name
+                for result in ranking
+                for name in result["outcome"]["scores"]
+                if name.startswith(("recall_at_", "ndcg_at_"))
+                or name in {"reciprocal_rank", "brier", "soft_score", "required_top_k"}
+            }
+        )
+        ranking_summary: JsonDict = {"cells": len(ranking)}
+        for name in metric_names:
+            values = [metric for result in ranking if (metric := value(result, name)) is not None]
+            if values:
+                ranking_summary[name] = round(sum(values) / len(values), 12)
+        summary["ranking"] = ranking_summary
+    return summary
+
+
 def markdown_report(
     experiment: Experiment,
     results: dict[str, JsonDict],
     judge_wins: JsonDict,
     human_wins: JsonDict,
     judge_agreement: JsonDict,
+    classifier_summary: JsonDict,
 ) -> str:
     lines = [
         f"# {experiment.id}",
@@ -146,6 +209,26 @@ def markdown_report(
             f"| {scores} | {session.get('wall_clock_seconds', 0):.0f} "
             f"| {session.get('usage', {}).get('output', 0)} |"
         )
+
+    if classifier_summary:
+        lines.extend(
+            [
+                "",
+                "## Classifier metrics",
+                "",
+                f"Schema-valid cells: {classifier_summary['valid_cells']}/"
+                f"{classifier_summary['total_cells']} "
+                f"({classifier_summary['schema_validity_rate']:.0%}).",
+            ]
+        )
+        for kind in ("boolean", "ranking"):
+            metrics = classifier_summary.get(kind)
+            if not metrics:
+                continue
+            lines.extend(["", f"### {kind.title()}", "", "| metric | value |", "| --- | ---: |"])
+            for name, metric_value in sorted(metrics.items()):
+                display = str(metric_value) if name == "cells" else f"{metric_value:.6f}"
+                lines.append(f"| {name} | {display} |")
 
     for title, wins in (("Judge preferences", judge_wins), ("Human preferences", human_wins)):
         lines.extend(["", f"## {title}", ""])
@@ -191,6 +274,7 @@ def run_reduce(experiment: Experiment, paths: RunPaths) -> JsonDict:
     judge_wins = tally_pairwise(verdicts, results)
     human_wins = tally_pairwise(preferences, results)
     judge_agreement = agreement(verdicts, preferences)
+    classifier_summary = classifier_metrics(results)
 
     summary = {
         "experiment_id": experiment.id,
@@ -207,12 +291,20 @@ def run_reduce(experiment: Experiment, paths: RunPaths) -> JsonDict:
         "judge_wins": judge_wins,
         "human_wins": human_wins,
         "judge_agreement": judge_agreement,
+        "classifier_metrics": classifier_summary,
     }
     (paths.root / "results.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     (paths.root / "report.md").write_text(
-        markdown_report(experiment, results, judge_wins, human_wins, judge_agreement),
+        markdown_report(
+            experiment,
+            results,
+            judge_wins,
+            human_wins,
+            judge_agreement,
+            classifier_summary,
+        ),
         encoding="utf-8",
     )
     return summary

@@ -11,10 +11,17 @@
     "kind": {"type": "string", "minLength": 1},
     "fixture": {"type": "string", "description": "Relative path to a fixture repo dir (worktree kinds)"},
     "input": {"type": "string", "description": "Relative path to an input file (transform kinds)"},
+    "expected": {"type": "string", "description": "Relative path to a hidden expected-label file"},
     "prompt": {"type": "string", "minLength": 1},
     "evaluator": {"type": "string", "description": "Relative path to a deterministic evaluator script"},
     "evaluator_format": {"enum": ["json", "unittest"], "default": "json"},
     "metrics": {"type": "array", "minItems": 1, "items": {"type": "string"}},
     "untrusted": {"const": true}
-  }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"kind": {"const": "transform-classifier"}}},
+      "then": {"required": ["input", "expected"]}
+    }
+  ]
 }

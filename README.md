@@ -43,6 +43,8 @@ evals judge  tests/fixtures/exp-transform.yaml --run-id demo
 evals prefer tests/fixtures/exp-transform.yaml --run-id demo
 evals reduce tests/fixtures/exp-transform.yaml --run-id demo
 evals bundle tests/fixtures/exp-transform.yaml --run-id demo --validate
+
+evals score-classifier result.json hidden-expected.json --k 20
 ```
 
 The report lands at `runs/<experiment>/<run-id>/report.md`: per-cell status and
@@ -59,6 +61,9 @@ judge-vs-human agreement.
 - `tasks/<id>/task.yaml` — a reusable task: `kind` (`worktree-*` kinds get a
   fresh git fixture and tools; `transform-*` kinds get an input inlined into
   the prompt and no tools), prompt, optional deterministic evaluator, metrics.
+  A `transform-classifier` task also names a hidden expected-label file.
+- `schemas/classifier-result.schema.json` — the strict boolean and ranking
+  result contract. `schemas/classifier-expected.schema.json` defines hidden labels.
 - `judges/*.yaml` — rubrics: versioned metric definitions plus judging
   instructions.
 - `models.yaml` — provider registry (Ollama, GitHub Models); rendered into a

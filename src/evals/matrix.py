@@ -39,11 +39,21 @@ class Cell:
 
 
 def spec_hash(experiment: Experiment, cell: Cell) -> str:
+    def file_digest(path: Any) -> str | None:
+        if path is None:
+            return None
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
     resolved = {
         "experiment_id": experiment.id,
         "task_id": experiment.task.id,
         "task_kind": experiment.task.kind,
         "prompt_sha256": hashlib.sha256(experiment.task.prompt.encode()).hexdigest(),
+        "input_sha256": file_digest(experiment.task.input),
+        "expected_sha256": file_digest(experiment.task.expected),
+        "agent_instruction_sha256": hashlib.sha256(
+            experiment.agent_instructions.get(cell.agent, "").encode()
+        ).hexdigest(),
         "container_image": experiment.container_image,
         "container_digest": experiment.container_digest,
         "model_ref": cell.model_ref,

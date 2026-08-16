@@ -1,4 +1,4 @@
-"""evals CLI: validate | matrix | run | judge | prefer | reduce | bundle | smoke."""
+"""Command-line interface for the evaluation harness."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from .bundle import BundleError, run_bundle, run_validate
+from .classifier import ClassifierError, load_and_score
 from .collect import run_cell
 from .container import (
     AgentRunner,
@@ -76,6 +77,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub_smoke = sub.add_parser("smoke", help="probe one model through the container")
     sub_smoke.add_argument("experiment", type=Path)
     sub_smoke.add_argument("model_ref", help="provider/model to probe")
+
+    sub_classifier = sub.add_parser(
+        "score-classifier", help="score one classifier result against a hidden label"
+    )
+    sub_classifier.add_argument("result", type=Path, help="classifier result JSON")
+    sub_classifier.add_argument("expected", type=Path, help="hidden expected-label JSON")
+    sub_classifier.add_argument("--k", type=int, default=20, help="ranking cutoff (default: 20)")
     return parser
 
 
@@ -83,12 +91,16 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return dispatch(args)
-    except (SpecError, ContainerError, BundleError) as error:
+    except (SpecError, ContainerError, BundleError, ClassifierError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
 
 
 def dispatch(args: argparse.Namespace) -> int:
+    if args.command == "score-classifier":
+        print(json.dumps(load_and_score(args.result, args.expected, k=args.k), sort_keys=True))
+        return 0
+
     experiment = load_experiment(args.experiment)
 
     if args.command == "validate":

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-outfitter.dev/schemas/classifier-result-v1.schema.json",
+  "title": "ClassifierResultV1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "kind", "decision", "confidence", "evidence_refs"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "kind": {"const": "boolean"},
+        "decision": {"type": "boolean"},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "evidence_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string"}
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "kind", "items"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "kind": {"const": "ranking"},
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "score", "confidence", "evidence_refs"],
+            "properties": {
+              "id": {"type": "string"},
+              "score": {"type": "number", "minimum": 0, "maximum": 1},
+              "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+              "evidence_refs": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -9,6 +9,7 @@ from typing import Any
 
 from jsonschema.validators import validator_for
 
+from .classifier import ClassifierError, validate_classifier_expected
 from .pi import load_yaml
 
 JsonDict = dict[str, Any]
@@ -169,6 +170,7 @@ class Task:
     metrics: list[str]
     fixture: Path | None
     input: Path | None
+    expected: Path | None
     evaluator: Path | None
     evaluator_format: str
 
@@ -201,6 +203,7 @@ class Experiment:
     registry: ProviderRegistry
     task: Task
     judges: list[Judge]
+    agent_instructions: dict[str, str]
 
     @property
     def id(self) -> str:
@@ -259,6 +262,7 @@ def load_task(path: Path, repo_root: Path) -> Task:
         metrics=[str(m) for m in document["metrics"]],
         fixture=resolve("fixture"),
         input=resolve("input"),
+        expected=resolve("expected"),
         evaluator=resolve("evaluator"),
         evaluator_format=str(document.get("evaluator_format", "json")),
     )
@@ -294,10 +298,31 @@ def load_experiment(path: Path) -> Experiment:
     )
     task = load_task(contained(path.parent / str(document["task"]), repo_root, "task"), repo_root)
 
+    agent_instructions: dict[str, str] = {}
+    for agent, instruction_path in document.get("agents", {}).items():
+        resolved = contained(path.parent / str(instruction_path), repo_root, f"agent {agent}")
+        if not resolved.is_file():
+            raise SpecError(f"agent {agent} instructions not found: {resolved}")
+        agent_instructions[str(agent)] = resolved.read_text(encoding="utf-8")
+    missing_agents = [
+        str(agent) for agent in document["matrix"]["agent"] if str(agent) not in agent_instructions
+    ]
+    if agent_instructions and missing_agents:
+        raise SpecError(f"agents mapping lacks matrix agents: {missing_agents}")
+
     if task.kind.startswith("worktree") and task.fixture is None:
         raise SpecError(f"task {task.id}: worktree kinds require a fixture")
     if task.kind.startswith("transform") and task.input is None:
         raise SpecError(f"task {task.id}: transform kinds require an input")
+    if task.kind == "transform-classifier" and task.expected is None:
+        raise SpecError(f"task {task.id}: transform-classifier requires an expected label")
+    if task.kind == "transform-classifier":
+        assert task.expected is not None
+        try:
+            expected = json.loads(task.expected.read_text(encoding="utf-8"))
+            validate_classifier_expected(expected)
+        except (OSError, json.JSONDecodeError, ClassifierError) as error:
+            raise SpecError(f"task {task.id}: invalid expected label: {error}") from error
 
     judges = []
     for raw in document["judges"]:
@@ -322,6 +347,7 @@ def load_experiment(path: Path) -> Experiment:
         registry=registry,
         task=task,
         judges=judges,
+        agent_instructions=agent_instructions,
     )
 
     for model_ref in experiment.matrix["model"]:
