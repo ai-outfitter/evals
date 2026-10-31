@@ -1,0 +1,61 @@
+version: 1
+id: resident-executive-documents
+timeout_seconds: 600
+model_settings:
+  thinking: "off"
+  thinking_format: qwen-chat-template
+  max_tokens: 8192
+variants: [baseline, retrieval, collaboration]
+documents:
+  - key: product-roadmap
+    actor: luce
+    kind: product_roadmap_lifecycle
+    role: cpo
+  - key: engineering-strategy
+    actor: vega
+    kind: engineering_tech_stack_strategy
+    role: cto
+prompts:
+  charter: >-
+    Prepare a substantive initial BoardCharter for the selected real organization.
+    Use the organization's stored facts and the exact JSON Schema in your system context.
+    Use one or two short sentences per principle, aiming for under 300 characters per field.
+    Produce the concise complete document directly; the runner validates field limits.
+    Keep status draft. Distinguish proposals from established facts; record missing evidence
+    and questions without inventing commitments, approvals, quorum rules, or adoption.
+    Use available MCP read/search tools if needed. Do not modify app records yourself:
+    the authorized persistence adapter saves the exact validated result.
+    Complete with a JSON object containing document, sourceReferences, and openQuestions.
+  draft: >-
+    Draft the assigned executive document for this organization through your current role.
+    Use the exact document JSON Schema, organization charter, projects, goals and responsibilities
+    in your factual system context. Explain concrete priorities, rationale, sequencing,
+    dependencies, proposed measures and unresolved assumptions using the schema's fields.
+    Include the exact organization_id and owner_assignment_id supplied by the verified context.
+    Keep status draft. Label proposals and never invent established facts or approval.
+    Use available MCP read/search tools when needed. Do not modify app records yourself:
+    the authorized persistence adapter saves the exact validated result.
+    Complete with a JSON object containing document, sourceReferences, and openQuestions.
+  request_input: >-
+    Ask the other executive for specific input on this exact Wiki draft ID and revision.
+    Ask about decisions, dependencies and risks within their role. Produce a JSON object
+    containing request with documentId, revision, questions and requestedRole.
+    Do not wait or dispatch additional work; the coordinator delivers your request as a queued task.
+  review: >-
+    Provide substantive advisory input from your current organizational role on the supplied
+    exact draft revision and questions. Identify useful changes, dependencies, unsupported
+    assumptions and source references. This is advisory input, not formal agreement or approval.
+    Complete with JSON containing input, documentId, revision and sourceReferences.
+  revise: >-
+    Revise the supplied exact document using the other executive's actual input.
+    Preserve grounded facts, resolve or record disagreements, and keep status draft.
+    Return JSON containing document, sourceReferences, feedbackDisposition and openQuestions.
+    feedbackDisposition must identify which suggestions were incorporated or deferred and why.
+    Follow the exact JSON Schema from system context. Do not save or approve it yourself.
+rubric:
+  - "Grounding: established claims reference supplied or MCP-fetched records; proposals are labeled."
+  - "Specificity: useful company/project priorities replace generic executive boilerplate."
+  - "Feasibility: dependencies, risks and measures support an executable recommendation."
+  - "Collaboration: actual peer suggestions are incorporated or explicitly deferred with reasons."
+  - "Consistency: roadmap and engineering strategy reconcile sequencing and resource assumptions."
+  - "Authority: drafts remain unapproved and preserve the human decision holder."

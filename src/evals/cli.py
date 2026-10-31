@@ -44,6 +44,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="evals")
     sub = parser.add_subparsers(dest="command", required=True)
 
+    resident = sub.add_parser("resident", help="real-graph executive document experiments")
+    resident_sub = resident.add_subparsers(dest="resident_command", required=True)
+    inspect = resident_sub.add_parser("inspect", help="browse private local inputs, system prompts and transcripts")
+    inspect.add_argument("--evidence", type=Path, required=True)
+    inspect.add_argument("--port", type=int, default=4397)
+    for name in ("validate", "run"):
+        child = resident_sub.add_parser(name)
+        child.add_argument("experiment", type=Path)
+        if name == "run":
+            child.add_argument("--config", type=Path, required=True, help="private adapter/tenant config")
+            child.add_argument("--output", type=Path, required=True, help="private evidence root")
+            child.add_argument("--run-id", required=True)
+            child.add_argument("--variant", choices=["baseline", "retrieval", "collaboration"], default="collaboration")
+
     sub_validate = sub.add_parser("validate", help="validate an experiment and its referenced specs")
     sub_validate.add_argument("experiment", type=Path)
 
@@ -89,6 +103,13 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def dispatch(args: argparse.Namespace) -> int:
+    if args.command == "resident":
+        if args.resident_command == "inspect":
+            from .resident_inspect import serve
+            serve(args.evidence, args.port)
+            return 0
+        from .resident import main as resident_main
+        return resident_main(args)
     experiment = load_experiment(args.experiment)
 
     if args.command == "validate":

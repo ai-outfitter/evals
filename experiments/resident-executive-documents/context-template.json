@@ -1,0 +1,279 @@
+{
+  "version": 1,
+  "order": 10,
+  "name": "Executive document evaluation context",
+  "bindings": {
+    "resident": {
+      "op": "ref",
+      "id": "$params.agentId"
+    },
+    "organization": {
+      "op": "ref",
+      "id": "$params.organizationId"
+    },
+    "assignment": {
+      "op": "ref",
+      "id": "$params.assignmentId"
+    }
+  },
+  "require": [
+    {
+      "op": "present",
+      "value": "$resident"
+    },
+    {
+      "op": "present",
+      "value": "$organization"
+    },
+    {
+      "op": "present",
+      "value": "$assignment"
+    }
+  ],
+  "sections": [
+    {
+      "heading": "$resident.title",
+      "level": 1,
+      "fields": [
+        {
+          "label": "Reference",
+          "value": "$resident.ref"
+        },
+        {
+          "label": "Revision",
+          "value": "$resident.revision"
+        },
+        {
+          "label": "Stored description",
+          "value": "$resident.body"
+        }
+      ]
+    },
+    {
+      "heading": "$organization.title",
+      "fields": [
+        {
+          "label": "Reference",
+          "value": "$organization.ref"
+        },
+        {
+          "label": "Revision",
+          "value": "$organization.revision"
+        },
+        {
+          "label": "Purpose",
+          "value": "$organization.body"
+        }
+      ]
+    },
+    {
+      "heading": "$assignment.title",
+      "fields": [
+        {
+          "label": "Reference",
+          "value": "$assignment.ref"
+        },
+        {
+          "label": "Revision",
+          "value": "$assignment.revision"
+        },
+        {
+          "label": "Recorded assignment",
+          "value": "$assignment.body"
+        }
+      ]
+    },
+    {
+      "heading": "Charter",
+      "fields": [
+        {
+          "label": "Recorded charter",
+          "value": "$params.charter",
+          "missing": "Unresolved: no charter document exists"
+        },
+        {
+          "label": "BoardCharter JSON Schema",
+          "value": "$params.charterSchema"
+        }
+      ]
+    },
+    {
+      "heading": "Assigned document",
+      "fields": [
+        {
+          "label": "Document kind",
+          "value": "$params.documentKind"
+        },
+        {
+          "label": "JSON Schema",
+          "value": "$params.documentSchema"
+        }
+      ]
+    },
+    {
+      "heading": "Stored relationships",
+      "fields": [
+        {
+          "label": "Relationships",
+          "value": "$params.relationships"
+        }
+      ]
+    },
+    {
+      "heading": "Recorded controls",
+      "fields": [
+        {
+          "label": "Control records and revisions",
+          "value": "$params.controls"
+        }
+      ]
+    },
+    {
+      "heading": "$item.title",
+      "rows": {
+        "op": "query",
+        "type": "Agent"
+      },
+      "fields": [
+        {
+          "label": "Reference",
+          "value": "$item.ref"
+        },
+        {
+          "label": "Revision",
+          "value": "$item.revision"
+        }
+      ]
+    },
+    {
+      "heading": "$item.title",
+      "rows": {
+        "op": "query",
+        "type": "RoleAssignment"
+      },
+      "fields": [
+        {
+          "label": "Reference",
+          "value": "$item.ref"
+        },
+        {
+          "label": "Revision",
+          "value": "$item.revision"
+        },
+        {
+          "label": "Stored assignment",
+          "value": "$item.body"
+        }
+      ]
+    },
+    {
+      "heading": "$item.title",
+      "rows": {
+        "op": "query",
+        "type": "Role"
+      },
+      "fields": [
+        {
+          "label": "Reference",
+          "value": "$item.ref"
+        },
+        {
+          "label": "Revision",
+          "value": "$item.revision"
+        },
+        {
+          "label": "Responsibilities",
+          "value": "$item.body"
+        }
+      ]
+    },
+    {
+      "heading": "$item.title",
+      "rows": {
+        "op": "query",
+        "type": "Board"
+      },
+      "fields": [
+        {
+          "label": "Reference",
+          "value": "$item.ref"
+        },
+        {
+          "label": "Revision",
+          "value": "$item.revision"
+        },
+        {
+          "label": "Stored context",
+          "value": "$item.body"
+        }
+      ]
+    },
+    {
+      "heading": "$item.title",
+      "rows": {
+        "op": "query",
+        "type": "Project"
+      },
+      "fields": [
+        {
+          "label": "Reference",
+          "value": "$item.ref"
+        },
+        {
+          "label": "Revision",
+          "value": "$item.revision"
+        },
+        {
+          "label": "Summary",
+          "value": "$item.summary"
+        },
+        {
+          "label": "Stored context",
+          "value": "$item.body"
+        }
+      ]
+    },
+    {
+      "heading": "$item.title",
+      "rows": {
+        "op": "query",
+        "type": "Goal"
+      },
+      "fields": [
+        {
+          "label": "Reference",
+          "value": "$item.ref"
+        },
+        {
+          "label": "Revision",
+          "value": "$item.revision"
+        },
+        {
+          "label": "Stored context",
+          "value": "$item.body"
+        }
+      ]
+    },
+    {
+      "heading": "$item.title",
+      "rows": {
+        "op": "query",
+        "type": "Plan"
+      },
+      "fields": [
+        {
+          "label": "Reference",
+          "value": "$item.ref"
+        },
+        {
+          "label": "Revision",
+          "value": "$item.revision"
+        },
+        {
+          "label": "Definition",
+          "value": "$item.body"
+        }
+      ]
+    }
+  ]
+}

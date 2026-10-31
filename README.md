@@ -17,6 +17,9 @@ per experiment, so the machinery can be reviewed apart from the findings.
 
 ## Runners
 
+For real company graphs, resident tasks and reciprocal executive input, see
+[executive document evaluations](docs/resident-executive-documents.md).
+
 A provider declares how its cells execute:
 
 | runner | how | isolation |
