@@ -6,6 +6,7 @@ import json
 import time
 from pathlib import Path
 from urllib.parse import quote
+from .resident import failure_state
 
 
 def page(title, content):
@@ -25,10 +26,14 @@ def render(root: Path):
         relative = outcome_file.parent.relative_to(root)
         report = quote((relative / ("report.md" if (outcome_file.parent/"report.md").exists() else "outcome.json")).as_posix())
         status = outcome['status']
+        if status == 'blocked':
+            status = failure_state(outcome.get('error', {}).get('message', ''))
         progress_file = outcome_file.parent / "progress.json"
         if status == "running" and progress_file.exists():
             progress = json.loads(progress_file.read_text())
             status = "stalled" if time.time() > progress.get("deadline", float("inf")) else progress.get("state", status)
+        if status == "running" and not progress_file.exists() and time.time() - outcome_file.stat().st_mtime > 660:
+            status = "stalled (legacy run)"
         reason = outcome.get("error", {}).get("message", "")
         rows.append(f"<tr><td>{escape(str(relative))}</td><td>{escape(status)}</td>"
                     f"<td>{escape(reason)}<br><a href='{report}'>Run status/report</a> · <a href='{quote((relative/'steps').as_posix())}/'>Inputs and steps</a></td></tr>")
