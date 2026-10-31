@@ -19,6 +19,7 @@ class FakeAdapter:
         self.fail_once = None
         self.saved = {}
         self.stale = False
+        self.missing_charter = False
 
     def call(self, request):
         self.calls.append(copy.deepcopy(request))
@@ -30,7 +31,7 @@ class FakeAdapter:
             return {"organizationId": "platform-org", "organizationNodeId": "org", "wikiInstallationId": "wiki", "actors": {
                 actor: {"verified": True, "agentId": actor, "assignmentId": actor + "-role"}
                 for actor in ["luce", "vega"]}, "charterType": {"typeId": "charter", "schema": SCHEMA},
-                "charter": {"id": "existing-charter", "revision": 1, "document": {"status": "draft"}},
+                "charter": None if self.missing_charter else {"id": "existing-charter", "revision": 1, "document": {"status": "draft"}},
                 "documents": [{**item, "typeId": "plan", "schema": SCHEMA} for item in request["documents"]]}
         if op == "context":
             return {"agentId": request["actor"], "organizationId": "org", "markdown": "# Stored graph facts\n",
@@ -38,7 +39,7 @@ class FakeAdapter:
                     "sources": [{"id": "org", "revision": 1}], "rendererVersion": 1}
         if op == "task":
             evidence = request.get("evidence") or {}
-            document = evidence.get("document", {})
+            document = evidence.get("document", {"organization_id":"org", "status":"draft"})
             draft = evidence.get("draft", evidence)
             if "draft" in evidence and "input" in evidence:
                 document = evidence["draft"]["document"]
@@ -55,7 +56,7 @@ class FakeAdapter:
             previous = request.get("previous")
             result = {"id": previous["id"] if previous else request["requestKey"],
                       "revision": previous["revision"] + 1 if previous else 1,
-                      "url": "https://example.test/draft", "bodyDigest": digest(request["document"])}
+                      "url": "https://example.test/draft", "bodyDigest": digest(request["document"]), "document": request["document"]}
             self.saved[request["requestKey"]] = result
             return result
         raise AssertionError(op)
@@ -123,6 +124,26 @@ class ResidentTests(unittest.TestCase):
         self.assertEqual(len(tasks), 2)
         self.assertTrue(all(not r["mcp"] for r in tasks))
         self.assertEqual([d["revision"] for d in result["documents"]], [1, 1])
+
+    def test_missing_charter_is_reviewed_and_saved_without_adoption(self):
+        self.adapter.missing_charter = True
+        result = self.experiment().run()
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["charter"]["revision"], 2)
+        self.assertEqual(result["charter"]["document"]["status"], "draft")
+
+    def test_stale_charter_feedback_prevents_revision(self):
+        self.adapter.missing_charter = True
+        self.adapter.stale = True
+        result = self.experiment().run()
+        self.assertEqual(result["status"], "configuration_failed")
+        self.assertIn("Charter peer input", result["error"]["message"])
+
+    def test_run_provenance_is_not_the_variant(self):
+        self.path = self.path / "actual-run-id" / "collaboration"
+        self.experiment().run()
+        saves = [x for x in self.adapter.calls if x["operation"] == "save"]
+        self.assertEqual(saves[0]["provenance"]["run"], "actual-run-id")
 
     def test_manifest_hashes_actual_evidence(self):
         self.experiment().run()

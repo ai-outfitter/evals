@@ -29,7 +29,7 @@ try {
 } catch (error) {
   throw new Error(error instanceof Response ? await error.text() : String(error));
 }
-const sources = [...new Map([...result.sources, ...[...graph.types,...graph.edges,...(input.prepared.controls??[])].map(t => ({ ref: t.ref, revision: t.revision }))]
+const sources = [...new Map([...result.sources, ...(input.charter ? [{ref:{installationId:input.prepared.wikiInstallationId,type:"graph-node",id:input.charter.id},revision:input.charter.revision}] : []), ...[...graph.types,...graph.edges,...(input.prepared.controls??[])].map(t => ({ ref: t.ref, revision: t.revision }))]
   .map(source => [JSON.stringify(source.ref), source])).values()];
 process.stdout.write(JSON.stringify({ ...result, sources, agentId: actor.agentId,
   organizationId: parameters.organizationId, includesCharterSchema: true, includesDocumentSchema: true,

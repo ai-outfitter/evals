@@ -96,7 +96,7 @@ const runtime = await startChannelsRuntime({ sendUserMessage: () => { throw new 
   storePath: join(directory, 'task-plane'), agentInterface: 'http://127.0.0.1', sources: [], taskTurnRunner: turns,
   taskPlaneReady: (_plane, q) => { queue = q; },
   listener: createA2aRuntimeListener({ enabled: () => true, loadConfig: async () => ({ host: '127.0.0.1', port: 0,
-    storePath: join(directory, 'a2a-store.json'), credentials: [{ token, principal: 'executive-eval' }],
+    storePath: join(directory, 'a2a-store.json'), credentials: [{ token, principal: 'executive-eval', trustedSystemContext: true }],
     agentName: 'executive-eval', agentDescription: 'Isolated resident evaluation', agentVersion: 'candidate', publicUrl: 'http://127.0.0.1' }) }, s => { server = s; }),
 });
 const headers = { Authorization: `Bearer ${token}`, 'content-type': 'application/a2a+json', 'a2a-version': '1.0' };
@@ -141,7 +141,7 @@ try {
   const observations = (await readFile(join(directory, 'provider-observations.jsonl'), 'utf8')).trim().split('\n').map(JSON.parse);
   // Rewrite observations through redaction before the bundle is exported.
   await save('provider-observations.json', observations);
-  await rm(join(directory, 'provider-observations.jsonl'), { force: true });
+  await writeFile(join(directory, 'provider-observations.jsonl'), observations.map(item => JSON.stringify(sanitize(item))).join('\n') + '\n', {mode:0o600});
   const transcripts = [];
   for (const file of await readdir(join(directory, 'sessions'), { recursive: true })) {
     if (file.endsWith('.jsonl')) transcripts.push({ path: file, content: await readFile(join(directory, 'sessions', file), 'utf8') });

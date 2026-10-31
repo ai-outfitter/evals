@@ -10,6 +10,7 @@ import fcntl
 import json
 import re
 import subprocess
+import shutil
 import time
 from pathlib import Path
 
@@ -148,6 +149,17 @@ class ResidentExperiment:
             if operation == "task" and result.get("status") != "completed":
                 write(path / "last-observation.json", result)
                 raise ResidentError("Task not completed; resume with the same accepted key")
+            if operation == "task" and result.get("artifactDirectory"):
+                source = Path(result["artifactDirectory"])
+                for filename in ("accepted-input.json", "accepted-envelope.json", "accepted-task.json",
+                                 "provider-observations.json", "transcripts.json", "task.json", "events.json",
+                                 "result.json", "mcp-identity.json", "mcp-audit.json", "capture-gap.json"):
+                    artifact = source / filename
+                    if artifact.is_file() and not artifact.is_symlink():
+                        destination = path / "runtime" / filename
+                        destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                        shutil.copyfile(artifact, destination)
+                        destination.chmod(0o600)
             write(result_path, result)
             write(self.directory / "progress.json", {"step": name, "state": "step_completed", "updatedAt": time.time()})
             write(path / "timing.json", {"elapsedMs": round((time.monotonic() - started) * 1000)})
@@ -194,7 +206,7 @@ class ResidentExperiment:
             "documentTypeId": document["typeId"], "document": body, "previous": previous,
             "assignmentId": prepared["actors"][actor]["assignmentId"],
             "provenance": {"experiment": self.spec["id"], "variant": self.variant,
-                           "run": self.directory.name, "taskId": response["taskId"]}})
+                           "run": self.directory.parent.name if self.directory.name == self.variant else self.directory.name, "taskId": response["taskId"]}})
         if not result.get("id") or not isinstance(result.get("revision"), int) or not result.get("url"):
             raise ResidentError("Save requires canonical Wiki ID, revision and URL")
         if result.get("bodyDigest") != digest(body):

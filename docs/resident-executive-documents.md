@@ -137,3 +137,12 @@ loopback evidence browser. Status distinguishes timeouts, interruptions,
 authentication/configuration failures and waiting for persistence; expired step
 deadlines appear stalled. Old immutable attempts retain their original failure
 records. Raw transcripts and composed system prompts remain private.
+
+A connected host can retain its existing OAuth connection using
+`scripts/resident-connected-host.py serve /private/connector.sock`. Configure
+`connectorCommand` as `["python3", "/checkout/scripts/resident-connected-host.py",
+"call", "/private/connector.sock"]`. The host automatically dispatches `next`
+requests through its connected Outfitter tools and supplies each decoded result
+with `respond`. The Unix socket is owner-only; no OAuth token is exported. If the
+host stops servicing it, calls time out visibly and resume uses the original keys.
+This bridge requires an active connected host; it is not an unattended OAuth daemon.
