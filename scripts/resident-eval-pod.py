@@ -6,6 +6,7 @@ The source workload is read-only; profile credentials stream pod-to-pod.
 import argparse
 import json
 import subprocess
+from pathlib import Path
 
 p = argparse.ArgumentParser()
 p.add_argument("--context", required=True)
@@ -49,13 +50,11 @@ source_exec = base + ["exec", args.source_pod, "-c", "agent", "--"]
 destination = base + ["exec", "-i", pod, "-c", "agent", "--"]
 # Filter the auth store to the configured model provider. Never copy GitHub,
 # platform admin, repository credentials, or the source resident's queue/store.
-extract = """
+extract = Path(__file__).with_name("resident-provider-environment.mjs").read_text().replace("export function", "function") + r"""
 import{readFileSync}from'node:fs';const p=process.env.PI_CODING_AGENT_DIR;
 const settings=JSON.parse(readFileSync(p+'/settings.json'));const provider=settings.defaultProvider;
 const models=JSON.parse(readFileSync(p+'/models.json'));const auth=JSON.parse(readFileSync(p+'/auth.json'));
-const required=[...JSON.stringify(models.providers[provider]).matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g)].map(m=>m[1]);
-if(required.some(name=>/GITHUB|GH_TOKEN/.test(name)))throw new Error('Repository credentials cannot enter an eval');
-const providerEnv=Object.fromEntries(required.filter(name=>process.env[name]!==undefined).map(name=>[name,process.env[name]]));
+const providerEnv=providerEnvironment(models.providers[provider],process.env);
 process.stdout.write(JSON.stringify({'SYSTEM.md':readFileSync(p+'/SYSTEM.md','utf8'),
  'provider-env.json':JSON.stringify(providerEnv),
  'settings.json':JSON.stringify({...settings,packages:[]}),
