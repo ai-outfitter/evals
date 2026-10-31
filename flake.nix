@@ -24,6 +24,7 @@
               pkgs.check-jsonschema
               pkgs.git
               pkgs.jq
+              pkgs.nodejs_24
             ];
             shellHook = ''
               export PYTHONPATH="$PWD/src''${PYTHONPATH:+:$PYTHONPATH}"
