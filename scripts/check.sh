@@ -24,7 +24,7 @@ done
 # Unit tests include the full stub pipeline:
 # run -> resume -> judge -> prefer(auto) -> reduce -> bundle -> validate.
 python3 -m unittest discover -s tests -v
-node --test tests/resident-mcp-relay.test.mjs
+node --test tests/*.test.mjs
 node --check scripts/resident-task.mjs
 node --check scripts/resident-mcp.mjs
 

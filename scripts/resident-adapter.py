@@ -132,7 +132,7 @@ let input='';for await(const c of process.stdin)input+=c;
 const x=JSON.parse(input);mkdirSync(x.directory,{recursive:true,mode:448});
 for(const [name,text] of Object.entries(x.files))writeFileSync(join(x.directory,name),text,{mode:384});
 process.stdout.write('{}');
-"""], {"directory": driver, "files": {name:(ROOT/"scripts"/name).read_text() for name in ["resident-task.mjs", "resident-mcp-relay.mjs"]}}, timeout=45)
+"""], {"directory": driver, "files": {name:(ROOT/"scripts"/name).read_text() for name in ["resident-task.mjs", "resident-mcp-relay.mjs", "resident-task-policy.mjs"]}}, timeout=45)
         argv = kube(actor) + ["env", "-u", "AI_OUTFITTER_GITHUB_TOKEN", "-u", "GITHUB_TOKEN", "-u", "GH_TOKEN", "EVAL_CHANNELS_PACKAGE=" + runtime["package"],
                 "EVAL_RESIDENT_DIRECTORY=" + runtime["directory"], "node", "--experimental-strip-types",
                 driver + "/resident-task.mjs"]

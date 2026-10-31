@@ -1,7 +1,24 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import test from 'node:test';
-import { readOnlyMcpRelay } from '../scripts/resident-mcp-relay.mjs';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { nativeMcpVerified, readOnlyMcpRelay, restoreMcpAudit } from '../scripts/resident-mcp-relay.mjs';
+test('same-task restart retains successful native identity evidence without a new call', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'resident-audit-'));
+  const path = join(directory, 'mcp-audit.json');
+  try {
+    assert.deepEqual(await restoreMcpAudit(path), []);
+    await writeFile(path, JSON.stringify([{ tool: 'whoami', verifiedPrincipal: 'resident:original' }]));
+    const restored = await restoreMcpAudit(path);
+    assert.equal(nativeMcpVerified(restored, 'resident:original'), true);
+    assert.equal(nativeMcpVerified(restored, 'resident:other'), false);
+    assert.equal(nativeMcpVerified([{tool: 'whoami', httpStatus: 200}], 'resident:original'), false);
+    await writeFile(path, '{}');
+    await assert.rejects(restoreMcpAudit(path), /Invalid persisted/);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
 test('native MCP relay permits scoped reads and prevents writes or cross-organization access', async () => {
   let calls = 0;
   const upstream = createServer(async (request, response) => {
@@ -22,6 +39,34 @@ test('native MCP relay permits scoped reads and prevents writes or cross-organiz
     ]) assert.equal((await send('call_app_action',args)).status,403);
     assert.equal((await send('create_entity',{organizationId:'org',installationId:'wiki'})).status,403);
     assert.equal(calls,1);
+    assert.ok(!JSON.stringify(audit).includes('private-token'));
+  } finally { await relay.close(); await new Promise(resolve => upstream.close(resolve)); }
+});
+
+test('identity verification requires a successful native whoami result, including SSE responses', async () => {
+  let mode = 'json';
+  const upstream = createServer((request, response) => {
+    const rpc = { jsonrpc: '2.0', id: 1, result: {
+      ...(mode === 'error' ? { isError: true } : {}),
+      content: [{ type: 'text', text: JSON.stringify({ id: 'resident:verified' }) }],
+    } };
+    response.writeHead(mode === 'http-error' ? 401 : 200, {
+      'content-type': mode === 'sse' ? 'text/event-stream' : 'application/json',
+    }).end(mode === 'sse' ? `event: message\ndata: ${JSON.stringify(rpc)}\n\n` : JSON.stringify(rpc));
+  });
+  await new Promise(resolve => upstream.listen(0, '127.0.0.1', resolve));
+  const audit = [], relay = await readOnlyMcpRelay({
+    url: `http://127.0.0.1:${upstream.address().port}`, token: 'private-token',
+    organizationId: 'org', installationIds: ['wiki'], audit,
+  });
+  try {
+    for (const variant of ['json', 'sse', 'error', 'http-error']) {
+      mode = variant;
+      await fetch(relay.url, { method: 'POST', headers: { Authorization: `Bearer ${relay.transportToken}` },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'whoami', arguments: {} } }),
+      });
+      assert.equal(audit.at(-1).verifiedPrincipal, ['json', 'sse'].includes(mode) ? 'resident:verified' : undefined);
+    }
     assert.ok(!JSON.stringify(audit).includes('private-token'));
   } finally { await relay.close(); await new Promise(resolve => upstream.close(resolve)); }
 });
