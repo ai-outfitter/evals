@@ -57,7 +57,7 @@ if (mcpRelay) {
 const settings = JSON.parse(await readFile(join(agentDir, 'settings.json'), 'utf8'));
 // Do not start the registered resident's channel extensions in this isolated process.
 settings.packages = [];
-settings.defaultTools = ['a2a_read_task', 'a2a_complete_task', ...(input.mcp ? ['mcp__outfitter__whoami', 'mcp__outfitter__list_app_actions', 'mcp__outfitter__call_app_action', 'mcp__outfitter__list_organizations', 'mcp', 'tool_search'] : [])];
+settings.defaultTools = ['a2a_read_task', 'a2a_complete_task', ...(input.mcp ? ['mcp__outfitter__outfitter_identity_get', 'mcp__outfitter__outfitter_app_action_list', 'mcp__outfitter__outfitter_app_action_call', 'mcp__outfitter__outfitter_organization_list', 'mcp', 'tool_search'] : [])];
 await writeFile(join(agentDir, 'settings.json'), JSON.stringify(settings), { mode: 0o600 });
 const authored = await readFile(join(original, 'SYSTEM.md'), 'utf8');
 const models = await ModelRuntime.create({ modelsPath: join(agentDir, 'models.json'), authPath: join(agentDir, 'auth.json') });
@@ -75,7 +75,7 @@ if (input.mcp) {
   const r = await fetch(process.env.OUTFITTER_MANAGED_MCP_URL, {
     method: 'POST', signal: AbortSignal.timeout(30000),
     headers: { Authorization: `Bearer ${process.env.OUTFITTER_MANAGED_MCP_TOKEN}`, 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'whoami', arguments: {} } }),
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'outfitter_identity_get', arguments: {} } }),
   });
   const raw = await r.text();
   const message = raw.split('\n').find(line => line.startsWith('data:'));

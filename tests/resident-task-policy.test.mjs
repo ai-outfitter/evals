@@ -12,9 +12,9 @@ test('task routing scope distinguishes platform and graph organizations without 
   assert.ok(prompt.includes('"documentOrganizationId":"wiki-org-node"'));
   assert.ok(prompt.includes('"wikiInstallationId":"wiki-installation"'));
   assert.ok(prompt.includes('"authorAssignmentId":"author-assignment"'));
-  assert.ok(prompt.includes('whoami'));
+  assert.ok(prompt.includes('outfitter_identity_get'));
   assert.ok(!prompt.includes(input.systemContext));
-  assert.ok(!residentTaskInstructions({ ...input, mcp: false }).includes('whoami'));
+  assert.ok(!residentTaskInstructions({ ...input, mcp: false }).includes('outfitter_identity_get'));
 });
 
 test('ordinary document tasks expose completion without workflow writes or other task access', async () => {
