@@ -8,7 +8,7 @@ import { readFile, writeFile, mkdir, copyFile, readdir, rm } from 'node:fs/promi
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { nativeMcpVerified, readOnlyMcpRelay, restoreMcpAudit } from './resident-mcp-relay.mjs';
-import { completionInstructions, selectResidentTaskTools } from './resident-task-policy.mjs';
+import { residentTaskInstructions, selectResidentTaskTools } from './resident-task-policy.mjs';
 let stdin = '';
 for await (const chunk of process.stdin) stdin += chunk;
 const input = JSON.parse(stdin);
@@ -101,7 +101,7 @@ const runtime = await startChannelsRuntime({ sendUserMessage: () => { throw new 
     agentName: 'executive-eval', agentDescription: 'Isolated resident evaluation', agentVersion: 'candidate', publicUrl: 'http://127.0.0.1' }) }, s => { server = s; }),
 });
 const headers = { Authorization: `Bearer ${token}`, 'content-type': 'application/a2a+json', 'a2a-version': '1.0' };
-const instructions = `${input.instructions}\n\n${input.mcp ? 'Call the native Outfitter MCP whoami tool once to verify your current acting principal. ' : ''}${completionInstructions}\n\nTask evidence:\n${JSON.stringify(input.evidence ?? {})}`;
+const instructions = residentTaskInstructions(input);
 // Stable message ID is retained across process restarts and unknown-outcome retries.
 const body = { message: { messageId: input.requestKey, role: 'ROLE_USER', parts: [{ text: JSON.stringify({ kind: 'outfitter.resident-task/v1', instructions, systemContext: input.systemContext }) }] }, configuration: { returnImmediately: true } };
 await save('accepted-envelope.json', body);

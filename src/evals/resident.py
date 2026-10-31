@@ -32,6 +32,8 @@ def failure_state(message: str) -> str:
         return "runtime_interrupted"
     if any(word in message for word in ("authentication", "credential", "principal", "unauthorized", "forbidden")):
         return "authentication_failed"
+    if any(phrase in message for phrase in ("schema validation", "document organization", "document kind", "draft owner", "structured document")):
+        return "validation_failed"
     return "configuration_failed"
 
 
@@ -191,6 +193,7 @@ class ResidentExperiment:
              instruction: str, evidence: dict | None = None) -> dict:
         result = self.step(name, "task", {"actor": actor, "identity": prepared["actors"][actor],
             "organizationId": prepared["organizationId"], "wikiInstallationId": prepared["wikiInstallationId"],
+            "documentOrganizationId": prepared["organizationNodeId"],
             "modelSettings": self.spec.get("model_settings", {}),
             "systemContext": context["markdown"], "contextDigest": digest(context),
             "instructions": instruction, "evidence": evidence,

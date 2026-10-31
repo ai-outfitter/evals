@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from evals.resident import ResidentExperiment, ResidentError, check_document, digest, load_spec
+from evals.resident import ResidentExperiment, ResidentError, check_document, digest, failure_state, load_spec
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "experiments/resident-executive-documents/resident.yaml"
@@ -116,6 +116,11 @@ class ResidentTests(unittest.TestCase):
                      {"organization_id": "org", "status": "adopted"}]:
             with self.assertRaises(ResidentError):
                 check_document(body, SCHEMA, "org")
+
+    def test_generated_document_errors_are_validation_failures(self):
+        for message in ["Document organization does not match selected graph", "Schema validation failed at /status", "Draft owner must be the verified current role assignment"]:
+            self.assertEqual(failure_state(message), "validation_failed")
+        self.assertEqual(failure_state("Missing authentication configuration"), "authentication_failed")
 
     def test_baseline_has_no_mcp_or_peer_tasks(self):
         result = self.experiment("baseline").run()
