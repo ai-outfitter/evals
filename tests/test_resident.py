@@ -145,6 +145,20 @@ class ResidentTests(unittest.TestCase):
         saves = [x for x in self.adapter.calls if x["operation"] == "save"]
         self.assertEqual(saves[0]["provenance"]["run"], "actual-run-id")
 
+    def test_failed_task_includes_checkpoint_artifacts(self):
+        runtime = Path(self.tmp.name) / "adapter/checkpoint/runtime"
+        runtime.mkdir(parents=True)
+        (runtime / "transcripts.json").write_text("[]")
+        original = self.adapter.call
+        def interrupted(request):
+            if request["operation"] == "task":
+                raise ResidentError("Runtime interrupted", runtime)
+            return original(request)
+        self.adapter.call = interrupted
+        self.assertEqual(self.experiment().run()["status"], "runtime_interrupted")
+        manifest = json.loads((self.path / "artifact-manifest.json").read_text())
+        self.assertTrue(any(row["path"].endswith("runtime/transcripts.json") for row in manifest["artifacts"]))
+
     def test_manifest_hashes_actual_evidence(self):
         self.experiment().run()
         manifest = json.loads((self.path / "artifact-manifest.json").read_text())

@@ -198,4 +198,4 @@ process.stdout.write(JSON.stringify(result));
 try:
     print(json.dumps(execute()))
 except Exception as error:
-    print(json.dumps({"error": str(error), "type": type(error).__name__}))
+    print(json.dumps({"error": str(error), "type": type(error).__name__, "artifactDirectory": str(directory / "runtime")}))

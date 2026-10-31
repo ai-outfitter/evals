@@ -19,7 +19,9 @@ import yaml
 
 
 class ResidentError(Exception):
-    pass
+    def __init__(self, message, artifact_directory=None):
+        super().__init__(message)
+        self.artifact_directory = artifact_directory
 
 
 def failure_state(message: str) -> str:
@@ -81,7 +83,7 @@ class CommandAdapter:
         if not isinstance(response, dict):
             raise ResidentError("Adapter response must be an object")
         if response.get("error"):
-            raise ResidentError(str(response["error"]))
+            raise ResidentError(str(response["error"]), response.get("artifactDirectory"))
         return response
 
 
@@ -129,6 +131,20 @@ class ResidentExperiment:
             raise ResidentError("Unknown experiment variant")
         self.state: dict = {}
 
+    def capture_runtime(self, path: Path, source_directory) -> None:
+        if not source_directory:
+            return
+        source = Path(source_directory)
+        for filename in ("accepted-input.json", "accepted-envelope.json", "accepted-task.json",
+                         "provider-observations.json", "transcripts.json", "task.json", "events.json",
+                         "result.json", "mcp-identity.json", "mcp-audit.json", "capture-gap.json"):
+            artifact = source / filename
+            if artifact.is_file() and not artifact.is_symlink():
+                destination = path / "runtime" / filename
+                destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                shutil.copyfile(artifact, destination)
+                destination.chmod(0o600)
+
     def step(self, name: str, operation: str, payload: dict) -> dict:
         path = self.directory / "steps" / name
         request = {"operation": operation, "requestKey": digest({"run": str(self.directory.resolve()),
@@ -146,25 +162,20 @@ class ResidentExperiment:
         started = time.monotonic()
         try:
             result = self.adapter.call(request)
+            if operation == "task":
+                self.capture_runtime(path, result.get("artifactDirectory"))
             if operation == "task" and result.get("status") != "completed":
                 write(path / "last-observation.json", result)
                 raise ResidentError("Task not completed; resume with the same accepted key")
-            if operation == "task" and result.get("artifactDirectory"):
-                source = Path(result["artifactDirectory"])
-                for filename in ("accepted-input.json", "accepted-envelope.json", "accepted-task.json",
-                                 "provider-observations.json", "transcripts.json", "task.json", "events.json",
-                                 "result.json", "mcp-identity.json", "mcp-audit.json", "capture-gap.json"):
-                    artifact = source / filename
-                    if artifact.is_file() and not artifact.is_symlink():
-                        destination = path / "runtime" / filename
-                        destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-                        shutil.copyfile(artifact, destination)
-                        destination.chmod(0o600)
             write(result_path, result)
             write(self.directory / "progress.json", {"step": name, "state": "step_completed", "updatedAt": time.time()})
             write(path / "timing.json", {"elapsedMs": round((time.monotonic() - started) * 1000)})
             return result
         except BaseException as error:
+            source = getattr(error, "artifact_directory", None)
+            if not source and self.configuration.get("runtimeArtifactRoot"):
+                source = Path(self.configuration["runtimeArtifactRoot"]) / request["requestKey"] / "runtime"
+            self.capture_runtime(path, source)
             write(path / "failure.json", {"type": type(error).__name__, "message": str(error),
                                           "retry": "Resume same run; preserve unknown delivery outcome"})
             raise
