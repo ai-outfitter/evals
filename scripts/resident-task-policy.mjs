@@ -1,11 +1,25 @@
 // These evaluations submit ordinary A2A tasks, without a workflow manifest.
 // Workflow output tools cannot operate on them; persistence is handled outside
 // the model session by the authenticated adapter.
-export function selectResidentTaskTools(tools, resultKind) {
+export function selectResidentTaskTools(tools, resultKind, scope) {
   const allowed = new Set(['a2a_read_task', 'a2a_complete_task']);
   const required = { document: ['document'], revision: ['document', 'feedbackDisposition'],
     review: ['input', 'documentId', 'revision'], request: ['request'] }[resultKind];
   if (!required) throw new Error('Unknown resident evaluation result kind');
+  let document = { type: 'object' };
+  if (resultKind === 'document' || resultKind === 'revision') {
+    if (!scope?.documentSchema || !scope.documentOrganizationId || !scope.identity?.assignmentId)
+      throw new Error('Document completion requires its stored schema and verified scope');
+    document = { ...scope.documentSchema, required: [...new Set([...(scope.documentSchema.required ?? []), 'organization_id', 'status'])],
+      properties: { ...scope.documentSchema.properties,
+        organization_id: { ...scope.documentSchema.properties.organization_id, const: scope.documentOrganizationId },
+        status: { ...scope.documentSchema.properties.status, const: 'draft' },
+      } };
+    if (document.properties.owner_assignment_id) {
+      if (!document.required.includes('owner_assignment_id')) document.required.push('owner_assignment_id');
+      document.properties.owner_assignment_id = { ...document.properties.owner_assignment_id, const: scope.identity.assignmentId };
+    }
+  }
   return tools.filter(tool => allowed.has(tool.name)).map(tool => {
     if (tool.name !== 'a2a_complete_task') return tool;
     const outputs = tool.parameters.properties.outputs;
@@ -17,7 +31,7 @@ export function selectResidentTaskTools(tools, resultKind) {
       outputs: { ...outputs, minItems: 1, maxItems: 1, items: { ...outputs.items, properties: {
         ...outputs.items.properties, output: { type: 'string', const: 'evaluation' },
         value: { ...outputs.items.properties.value, required, properties: {
-          document: { type: 'object' }, request: { type: 'object', required: ['documentId', 'revision'],
+          document, request: { type: 'object', required: ['documentId', 'revision'],
             properties: { documentId: { type: 'string' }, revision: { type: 'integer' } } },
           documentId: { type: 'string' }, revision: { type: 'integer' }, input: {},
           feedbackDisposition: { anyOf: [{ type: 'string', minLength: 1 }, { type: 'array', minItems: 1 }, { type: 'object', minProperties: 1 }] },

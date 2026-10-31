@@ -93,7 +93,7 @@ const tools = [], token = randomUUID(), events = [];
 registerA2aTools({ registerTool: tool => tools.push(tool) }, () => server,
   async id => await queue?.hasAuthority(id) ?? false, () => true);
 const turns = new TaskSessionHost({ cwd: directory, agentDir, sessionDir: join(directory, 'sessions'),
-  customTools: selectResidentTaskTools(tools, input.resultKind), additionalExtensionPaths: [probePath], excludedExtensionRoot: root,
+  customTools: selectResidentTaskTools(tools, input.resultKind, input), additionalExtensionPaths: [probePath], excludedExtensionRoot: root,
   model: () => model, thinkingLevel: () => thinking,
   promptSources: { systemPrompt: authored }, log: event => events.push(event) });
 const runtime = await startChannelsRuntime({ sendUserMessage: () => { throw new Error('Unexpected parent wake'); } }, {

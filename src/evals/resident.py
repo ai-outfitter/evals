@@ -189,7 +189,7 @@ class ResidentExperiment:
         result = self.step(f"context-{actor}-{name}", "context", {
             "actor": actor, "prepared": prepared, "document": document, "charter": charter})
         verify_context(result, prepared, actor)
-        return result
+        return {**result, "documentSchema": document["schema"]}
 
     def task(self, name: str, prepared: dict, actor: str, context: dict,
              instruction: str, evidence: dict | None = None) -> dict:
@@ -197,6 +197,7 @@ class ResidentExperiment:
             "organizationId": prepared["organizationId"], "wikiInstallationId": prepared["wikiInstallationId"],
             "documentOrganizationId": prepared["organizationNodeId"],
             "resultKind": "request" if name.endswith("-request-input") else "review" if name.endswith("-peer-input") else "revision" if name.endswith("-revise") else "document",
+            "documentSchema": context["documentSchema"],
             "modelSettings": self.spec.get("model_settings", {}),
             "systemContext": context["markdown"], "contextDigest": digest(context),
             "instructions": instruction, "evidence": evidence,

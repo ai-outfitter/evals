@@ -77,7 +77,8 @@ existing native MCP credentials. This is distinct from webapp scheduler or publi
 
 Each completion supplies one `evaluation` data artifact containing the requested
 JSON object. Response text is a completion note and is never parsed as data.
-The eval-local completion tool checks stage fields before settling a task;
+The eval-local completion tool checks stage fields and the stored document schema
+before settling a task, with the verified organization/owner and draft state fixed;
 schema, exact revision and current assignment checks still run in the coordinator
 and persistence adapter. Task scope distinguishes MCP platform organization IDs
 from Wiki organization-node IDs. Neither metadata nor context grants authority.

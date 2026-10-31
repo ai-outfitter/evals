@@ -38,8 +38,22 @@ test('ordinary document tasks expose completion without workflow writes or other
   assert.equal(transitions, 2);
   const request = selectResidentTaskTools(tools, 'request')[1];
   assert.deepEqual(request.parameters.properties.outputs.items.properties.value.properties.request.required, ['documentId', 'revision']);
-  const revision = selectResidentTaskTools(tools, 'revision')[1];
+  const schema = { type: 'object', required: ['cadence'], additionalProperties: false, properties: {
+    organization_id: { type: 'string' }, status: { type: 'string' },
+    owner_assignment_id: { type: 'string' }, cadence: { enum: ['annual'] },
+  } };
+  const scope = { documentSchema: schema, documentOrganizationId: 'wiki-org', identity: { assignmentId: 'role-assignment' } };
+  const revision = selectResidentTaskTools(tools, 'revision', scope)[1];
   assert.deepEqual(revision.parameters.properties.outputs.items.properties.value.required, ['document', 'feedbackDisposition']);
+  const body = revision.parameters.properties.outputs.items.properties.value.properties.document;
+  assert.deepEqual(body.required, ['cadence', 'organization_id', 'status', 'owner_assignment_id']);
+  assert.equal(body.properties.organization_id.const, scope.documentOrganizationId);
+  assert.equal(body.properties.owner_assignment_id.const, scope.identity.assignmentId);
+  assert.equal(body.properties.status.const, 'draft');
+  assert.deepEqual(body.properties.cadence, schema.properties.cadence);
+  assert.equal(body.additionalProperties, false);
+  assert.deepEqual(schema.required, ['cadence']);
+  assert.equal(schema.properties.status.const, undefined);
 });
 
 test('only a single named structured artifact supplies the result; response text is never parsed', () => {
