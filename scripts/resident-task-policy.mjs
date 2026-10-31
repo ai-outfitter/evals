@@ -19,6 +19,12 @@ export function selectResidentTaskTools(tools, resultKind, scope) {
       if (!document.required.includes('owner_assignment_id')) document.required.push('owner_assignment_id');
       document.properties.owner_assignment_id = { ...document.properties.owner_assignment_id, const: scope.identity.assignmentId };
     }
+    if (document.properties.approval) document.properties.approval = { ...document.properties.approval, const: null };
+    if (document.properties.kind) {
+      if (!scope.documentKind) throw new Error('Plan completion requires its selected document kind');
+      document.properties.kind = { ...document.properties.kind, const: scope.documentKind };
+      if (!document.required.includes('kind')) document.required.push('kind');
+    }
   }
   return tools.filter(tool => allowed.has(tool.name)).map(tool => {
     if (tool.name !== 'a2a_complete_task') return tool;

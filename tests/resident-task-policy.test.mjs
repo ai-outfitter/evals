@@ -41,15 +41,18 @@ test('ordinary document tasks expose completion without workflow writes or other
   const schema = { type: 'object', required: ['cadence'], additionalProperties: false, properties: {
     organization_id: { type: 'string' }, status: { type: 'string' },
     owner_assignment_id: { type: 'string' }, cadence: { enum: ['annual'] },
+    approval: { type: ['object', 'null'] }, kind: { enum: ['roadmap', 'engineering'] },
   } };
-  const scope = { documentSchema: schema, documentOrganizationId: 'wiki-org', identity: { assignmentId: 'role-assignment' } };
+  const scope = { documentSchema: schema, documentKind: 'roadmap', documentOrganizationId: 'wiki-org', identity: { assignmentId: 'role-assignment' } };
   const revision = selectResidentTaskTools(tools, 'revision', scope)[1];
   assert.deepEqual(revision.parameters.properties.outputs.items.properties.value.required, ['document', 'feedbackDisposition']);
   const body = revision.parameters.properties.outputs.items.properties.value.properties.document;
-  assert.deepEqual(body.required, ['cadence', 'organization_id', 'status', 'owner_assignment_id']);
+  assert.deepEqual(body.required, ['cadence', 'organization_id', 'status', 'owner_assignment_id', 'kind']);
   assert.equal(body.properties.organization_id.const, scope.documentOrganizationId);
   assert.equal(body.properties.owner_assignment_id.const, scope.identity.assignmentId);
   assert.equal(body.properties.status.const, 'draft');
+  assert.equal(body.properties.approval.const, null);
+  assert.equal(body.properties.kind.const, 'roadmap');
   assert.deepEqual(body.properties.cadence, schema.properties.cadence);
   assert.equal(body.additionalProperties, false);
   assert.deepEqual(schema.required, ['cadence']);
