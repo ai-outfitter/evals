@@ -54,7 +54,8 @@ matched performance comparison.
 
 ## Isolated candidate runtime
 
-Pack the Channels branch supporting `systemContext` with `npm pack
+Use Channels 1.13.1 or later for trusted system context and ordinary structured
+result artifacts. For a candidate, pack its pinned source with `npm pack
 --ignore-scripts`. Stage it in a dedicated temporary pod directory and link its
 `node_modules` to existing runtime dependencies. Record pod UID, image digest,
 package/source hashes and Pi version. Preserve the registered resident process,
@@ -73,6 +74,13 @@ TaskSessionHost, submits `/message:send` and polls `/tasks/{id}`. It preserves a
 stable message ID and verifies duplicate acceptance. Pi uses the resident's
 existing native MCP credentials. This is distinct from webapp scheduler or public
 `tasks.submit` acceptance.
+
+Each completion supplies one `evaluation` data artifact containing the requested
+JSON object. Response text is a completion note and is never parsed as data.
+The eval-local completion tool checks stage fields before settling a task;
+schema, exact revision and current assignment checks still run in the coordinator
+and persistence adapter. Task scope distinguishes MCP platform organization IDs
+from Wiki organization-node IDs. Neither metadata nor context grants authority.
 
 ## Adapter and connected persistence
 

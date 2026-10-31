@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { residentTaskInstructions, selectResidentTaskTools } from '../scripts/resident-task-policy.mjs';
+import { residentTaskInstructions, residentTaskResult, selectResidentTaskTools } from '../scripts/resident-task-policy.mjs';
 
 test('task routing scope distinguishes platform and graph organizations without repeating graph context', () => {
   const input = { organizationId: 'platform-org', documentOrganizationId: 'wiki-org-node',
@@ -17,14 +17,39 @@ test('task routing scope distinguishes platform and graph organizations without 
   assert.ok(!residentTaskInstructions({ ...input, mcp: false }).includes('whoami'));
 });
 
-test('ordinary document tasks expose completion without workflow writes or other task access', () => {
+test('ordinary document tasks expose completion without workflow writes or other task access', async () => {
   const names = ['a2a_read_task', 'a2a_complete_task', 'a2a_record_output', 'a2a_list_tasks', 'a2a_cancel_task', 'future_tool'];
-  const tools = names.map(name => ({ name, execute() {} }));
-  const selected = selectResidentTaskTools(tools);
+  let transitions = 0;
+  const tools = names.map(name => ({ name, execute() { transitions++; }, parameters: { properties: {
+    outputs: { type: 'array', items: { type: 'object', properties: { output: { type: 'string' },
+      value: { type: 'object', additionalProperties: true } } } },
+  } } }));
+  const selected = selectResidentTaskTools(tools, 'review');
   assert.deepEqual(selected.map(tool => tool.name), ['a2a_read_task', 'a2a_complete_task']);
   assert.equal(selected[0], tools[0]);
-  assert.equal(selected[1], tools[1]);
+  assert.deepEqual(selected[1].parameters.properties.outputs.items.properties.value.required, ['input', 'documentId', 'revision']);
+  assert.equal(selected[1].parameters.properties.outputs.items.properties.output.const, 'evaluation');
+  assert.equal(tools[1].parameters.properties.outputs.items.properties.value.required, undefined);
   assert.equal(tools.length, names.length);
+  await assert.rejects(selected[1].execute('call', { outcome: 'completed' }), /requires the structured/);
+  assert.equal(transitions, 0);
+  await selected[1].execute('call', { outcome: 'rejected' });
+  await selected[1].execute('call', { outcome: 'completed', outputs: [{ output: 'evaluation', value: {} }] });
+  assert.equal(transitions, 2);
+  const request = selectResidentTaskTools(tools, 'request')[1];
+  assert.deepEqual(request.parameters.properties.outputs.items.properties.value.properties.request.required, ['documentId', 'revision']);
+  const revision = selectResidentTaskTools(tools, 'revision')[1];
+  assert.deepEqual(revision.parameters.properties.outputs.items.properties.value.required, ['document', 'feedbackDisposition']);
+});
+
+test('only a single named structured artifact supplies the result; response text is never parsed', () => {
+  const value = { input: ['actual peer feedback'], documentId: 'draft', revision: 1 };
+  const artifact = { name: 'evaluation', parts: [{ data: value }] };
+  assert.equal(residentTaskResult({ artifacts: [{ name: 'response', parts: [{ text: 'Human completion note' }] }, artifact] }), value);
+  for (const artifacts of [[], [{ name: 'response', parts: [{ text: JSON.stringify(value) }] }],
+    [artifact, artifact], [{ name: 'evaluation', parts: [{ data: JSON.stringify(value) }] }]]) {
+    assert.throws(() => residentTaskResult({ artifacts }), /exactly one structured/);
+  }
 });
 
 test('all task driver local module imports are staged by the remote adapter', () => {

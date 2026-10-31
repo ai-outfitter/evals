@@ -8,7 +8,7 @@ import { readFile, writeFile, mkdir, copyFile, readdir, rm } from 'node:fs/promi
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { nativeMcpVerified, readOnlyMcpRelay, restoreMcpAudit } from './resident-mcp-relay.mjs';
-import { residentTaskInstructions, selectResidentTaskTools } from './resident-task-policy.mjs';
+import { residentTaskInstructions, residentTaskResult, selectResidentTaskTools } from './resident-task-policy.mjs';
 let stdin = '';
 for await (const chunk of process.stdin) stdin += chunk;
 const input = JSON.parse(stdin);
@@ -35,6 +35,9 @@ const sanitize = value => {
 };
 const save = async (file, value) => writeFile(join(directory, file), JSON.stringify(sanitize(value), null, 2), { mode: 0o600 });
 const from = path => pathToFileURL(join(root, path)).href;
+const channelsVersion = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')).version;
+const version = channelsVersion.split('.').map(Number);
+assert.ok(version[0] > 1 || version[0] === 1 && (version[1] > 13 || version[1] === 13 && version[2] >= 1), 'Structured eval results require Channels 1.13.1 or later');
 const { ModelRuntime } = await import(from('node_modules/@earendil-works/pi-coding-agent/dist/index.js'));
 const { TaskSessionHost } = await import(from('extensions/task-plane/task-sessions.ts'));
 const { startChannelsRuntime } = await import(from('extensions/task-plane/runtime.ts'));
@@ -90,7 +93,7 @@ const tools = [], token = randomUUID(), events = [];
 registerA2aTools({ registerTool: tool => tools.push(tool) }, () => server,
   async id => await queue?.hasAuthority(id) ?? false, () => true);
 const turns = new TaskSessionHost({ cwd: directory, agentDir, sessionDir: join(directory, 'sessions'),
-  customTools: selectResidentTaskTools(tools), additionalExtensionPaths: [probePath], excludedExtensionRoot: root,
+  customTools: selectResidentTaskTools(tools, input.resultKind), additionalExtensionPaths: [probePath], excludedExtensionRoot: root,
   model: () => model, thinkingLevel: () => thinking,
   promptSources: { systemPrompt: authored }, log: event => events.push(event) });
 const runtime = await startChannelsRuntime({ sendUserMessage: () => { throw new Error('Unexpected parent wake'); } }, {
@@ -149,17 +152,20 @@ try {
     if (file.endsWith('.jsonl')) transcripts.push({ path: file, content: await readFile(join(directory, 'sessions', file), 'utf8') });
   }
   await save('transcripts.json', transcripts);
+  await checkpoint();
   const messages = transcripts.flatMap(file => file.content.trim().split('\n').map(line => JSON.parse(line)).map(entry => entry.message).filter(Boolean));
   const usage = messages.filter(message => message.role === 'assistant').reduce((total, message) => ({
     inputTokens: total.inputTokens + (message.usage?.input ?? 0), outputTokens: total.outputTokens + (message.usage?.output ?? 0),
     reasoningTokens: total.reasoningTokens + (message.usage?.reasoning ?? 0),
   }), { inputTokens: 0, outputTokens: 0, reasoningTokens: 0 });
-  const text = (current?.artifacts ?? []).flatMap(artifact => artifact.parts ?? []).map(part => part.text ?? '').join('\n');
-  let answer;
-  try { answer = JSON.parse(text.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '')); } catch { answer = { rawResponse: text }; }
+  let answer = {}, resultError;
+  if (current.status.state === 'TASK_STATE_COMPLETED') {
+    try { answer = residentTaskResult(current); } catch (error) { resultError = error.message; }
+  }
   const wire = observations.map(o => JSON.stringify(o.system));
   const toolNames = observations.flatMap(o => o.tools);
-  const result = { ...answer, taskId: current.id, status: current.status.state === 'TASK_STATE_COMPLETED' ? 'completed' : 'incomplete',
+  const result = { ...answer, taskId: current.id, status: resultError ? 'invalid_response' : current.status.state === 'TASK_STATE_COMPLETED' ? 'completed' : 'incomplete',
+    ...(resultError ? { resultError } : {}),
     elapsedMs: Date.now() - started, systemContextObserved: wire.some(value => value.includes(JSON.stringify(input.systemContext).slice(1,-1))),
     artifactsCaptured: transcripts.length > 0 && observations.length > 0,
     nativeMcpToolsExposed: input.mcp ? toolNames.some(name => /mcp|tool_search/.test(name)) : false,
@@ -171,7 +177,7 @@ try {
       evalOverrides: overrides, maxTokens: model.maxTokens, thinkingFormat: model.compat?.thinkingFormat,
       basePromptDigest: createHash('sha256').update(authored).digest('hex'),
       channelsSourceDigest: createHash('sha256').update(await readFile(join(root,'extensions/a2a-extension.ts'))).digest('hex'),
-      node: process.version, channelsPackage: root, piVersion: JSON.parse(await readFile(join(root, 'node_modules/@earendil-works/pi-coding-agent/package.json'))).version },
+      node: process.version, channelsPackage: root, channelsVersion, piVersion: JSON.parse(await readFile(join(root, 'node_modules/@earendil-works/pi-coding-agent/package.json'))).version },
     duplicateReturnsSameTask: true, artifactDirectory: directory };
   await save('mcp-audit.json', mcpAudit);
   result.mcpCalls = mcpAudit.filter(item => item.method === 'tools/call');

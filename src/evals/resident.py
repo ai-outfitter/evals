@@ -32,7 +32,7 @@ def failure_state(message: str) -> str:
         return "runtime_interrupted"
     if any(word in message for word in ("authentication", "credential", "principal", "unauthorized", "forbidden")):
         return "authentication_failed"
-    if any(phrase in message for phrase in ("schema validation", "document organization", "document kind", "draft owner", "structured document")):
+    if any(phrase in message for phrase in ("schema validation", "result validation", "document organization", "document kind", "draft owner", "structured document")):
         return "validation_failed"
     return "configuration_failed"
 
@@ -168,6 +168,8 @@ class ResidentExperiment:
                 self.capture_runtime(path, result.get("artifactDirectory"))
             if operation == "task" and result.get("status") != "completed":
                 write(path / "last-observation.json", result)
+                if result.get("status") == "invalid_response":
+                    raise ResidentError("Structured result validation failed; inspect the captured task artifacts")
                 raise ResidentError("Task not completed; resume with the same accepted key")
             write(result_path, result)
             write(self.directory / "progress.json", {"step": name, "state": "step_completed", "updatedAt": time.time()})
@@ -194,6 +196,7 @@ class ResidentExperiment:
         result = self.step(name, "task", {"actor": actor, "identity": prepared["actors"][actor],
             "organizationId": prepared["organizationId"], "wikiInstallationId": prepared["wikiInstallationId"],
             "documentOrganizationId": prepared["organizationNodeId"],
+            "resultKind": "request" if name.endswith("-request-input") else "review" if name.endswith("-peer-input") else "revision" if name.endswith("-revise") else "document",
             "modelSettings": self.spec.get("model_settings", {}),
             "systemContext": context["markdown"], "contextDigest": digest(context),
             "instructions": instruction, "evidence": evidence,
