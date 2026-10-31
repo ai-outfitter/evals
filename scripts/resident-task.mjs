@@ -7,7 +7,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFile, writeFile, mkdir, copyFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { readOnlyMcpRelay } from './resident-mcp-relay.mjs';
+import { nativeMcpVerified, readOnlyMcpRelay, restoreMcpAudit } from './resident-mcp-relay.mjs';
+import { completionInstructions, selectResidentTaskTools } from './resident-task-policy.mjs';
 let stdin = '';
 for await (const chunk of process.stdin) stdin += chunk;
 const input = JSON.parse(stdin);
@@ -41,7 +42,7 @@ const { createA2aRuntimeListener, registerA2aTools } = await import(from('extens
 const agentDir = join(directory, 'agent');
 await mkdir(agentDir, { recursive: true, mode: 0o700 });
 for (const file of ['models.json', 'auth.json', 'settings.json']) await copyFile(join(original, file), join(agentDir, file));
-const mcpAudit = [];
+const mcpAudit = await restoreMcpAudit(join(directory, 'mcp-audit.json'));
 const mcpRelay = input.mcp ? await readOnlyMcpRelay({ url: process.env.OUTFITTER_MANAGED_MCP_URL,
   token: process.env.OUTFITTER_MANAGED_MCP_TOKEN, organizationId: input.organizationId,
   installationIds: [input.wikiInstallationId], audit: mcpAudit }) : null;
@@ -89,7 +90,7 @@ const tools = [], token = randomUUID(), events = [];
 registerA2aTools({ registerTool: tool => tools.push(tool) }, () => server,
   async id => await queue?.hasAuthority(id) ?? false, () => true);
 const turns = new TaskSessionHost({ cwd: directory, agentDir, sessionDir: join(directory, 'sessions'),
-  customTools: tools, additionalExtensionPaths: [probePath], excludedExtensionRoot: root,
+  customTools: selectResidentTaskTools(tools), additionalExtensionPaths: [probePath], excludedExtensionRoot: root,
   model: () => model, thinkingLevel: () => thinking,
   promptSources: { systemPrompt: authored }, log: event => events.push(event) });
 const runtime = await startChannelsRuntime({ sendUserMessage: () => { throw new Error('Unexpected parent wake'); } }, {
@@ -100,13 +101,14 @@ const runtime = await startChannelsRuntime({ sendUserMessage: () => { throw new 
     agentName: 'executive-eval', agentDescription: 'Isolated resident evaluation', agentVersion: 'candidate', publicUrl: 'http://127.0.0.1' }) }, s => { server = s; }),
 });
 const headers = { Authorization: `Bearer ${token}`, 'content-type': 'application/a2a+json', 'a2a-version': '1.0' };
-const instructions = `${input.instructions}\n\n${input.mcp ? 'Call the native Outfitter MCP whoami tool once to verify your current acting principal. ' : ''}Complete this A2A task with a2a_complete_task. Put the requested JSON object in its response. Do not approve/adopt documents.\n\nTask evidence:\n${JSON.stringify(input.evidence ?? {})}`;
+const instructions = `${input.instructions}\n\n${input.mcp ? 'Call the native Outfitter MCP whoami tool once to verify your current acting principal. ' : ''}${completionInstructions}\n\nTask evidence:\n${JSON.stringify(input.evidence ?? {})}`;
 // Stable message ID is retained across process restarts and unknown-outcome retries.
 const body = { message: { messageId: input.requestKey, role: 'ROLE_USER', parts: [{ text: JSON.stringify({ kind: 'outfitter.resident-task/v1', instructions, systemContext: input.systemContext }) }] }, configuration: { returnImmediately: true } };
 await save('accepted-envelope.json', body);
 const started = Date.now();
 let capturedAt = 0;
 async function checkpoint() {
+  await save('mcp-audit.json', mcpAudit);
   const files = {};
   for (const name of ['accepted-input.json','accepted-envelope.json','accepted-task.json','task.json']) {
     try { files[name] = JSON.parse(await readFile(join(directory,name),'utf8')); } catch {}
@@ -160,7 +162,8 @@ try {
   const result = { ...answer, taskId: current.id, status: current.status.state === 'TASK_STATE_COMPLETED' ? 'completed' : 'incomplete',
     elapsedMs: Date.now() - started, systemContextObserved: wire.some(value => value.includes(JSON.stringify(input.systemContext).slice(1,-1))),
     artifactsCaptured: transcripts.length > 0 && observations.length > 0,
-    nativeMcpReady: input.mcp ? toolNames.some(name => /mcp|tool_search/.test(name)) : false,
+    nativeMcpToolsExposed: input.mcp ? toolNames.some(name => /mcp|tool_search/.test(name)) : false,
+    nativeMcpReady: input.mcp ? nativeMcpVerified(mcpAudit, input.identity.canonicalIdentityProof.principalId) : false,
     usage, providerRequests: observations.length, contextBytes: Buffer.byteLength(input.systemContext),
     systemWireBytes: Buffer.byteLength(JSON.stringify(observations[0]?.system)),
     graphDuplicatedOutsideSystem: observations.some(item=>item.nonSystemContainsGraph),

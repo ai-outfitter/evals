@@ -1,6 +1,19 @@
 /** Read-only credential relay; Pi remains the MCP client. No tool implementations. */
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+export async function restoreMcpAudit(path) {
+  try {
+    const audit = JSON.parse(await readFile(path, 'utf8'));
+    if (!Array.isArray(audit)) throw new Error('Invalid persisted MCP audit');
+    return audit;
+  } catch (error) {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  }
+}
+
+export const nativeMcpVerified = (audit, principal) => audit.some(item => item.verifiedPrincipal === principal);
 const readActions = new Set(['knowledge-graph.select', 'graph.relationships', 'work.context', 'resident.context',
   'projects.list', 'project.explore', 'governance.summary', 'governance.work-policy']);
 const readTools = new Set(['whoami', 'list_organizations', 'list_app_actions', 'get_entity', 'list_entities', 'list_entity_types']);
@@ -48,6 +61,17 @@ export async function readOnlyMcpRelay({ url, token, organizationId, installatio
       const headers = { 'content-type': upstream.headers.get('content-type') ?? 'application/json' };
       observation.httpStatus = upstream.status;
       observation.elapsedMs = Date.now() - observation.at;
+      if (upstream.ok && tool === 'whoami') {
+        try {
+          const text = Buffer.concat(result).toString('utf8');
+          const message = text.split('\n').find(line => line.startsWith('data:'));
+          const rpc = JSON.parse(message ? message.slice(5) : text);
+          if (!rpc.error && !rpc.result?.isError) {
+            const identity = JSON.parse(rpc.result.content.find(item => item.type === 'text').text);
+            if (typeof identity.id === 'string') observation.verifiedPrincipal = identity.id;
+          }
+        } catch { /* An undecodable identity response is not verification. */ }
+      }
       if (upstream.headers.has('mcp-session-id')) headers['mcp-session-id'] = upstream.headers.get('mcp-session-id');
       response.writeHead(upstream.status, headers).end(Buffer.concat(result));
     } catch {
