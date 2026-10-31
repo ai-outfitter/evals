@@ -17,6 +17,16 @@ export const nativeMcpVerified = (audit, principal) => audit.some(item => item.v
 const readActions = new Set(['knowledge-graph.select', 'graph.relationships', 'work.context', 'resident.context',
   'projects.list', 'project.explore', 'governance.summary', 'governance.work-policy']);
 const readTools = new Set(['outfitter_identity_get', 'outfitter_organization_list', 'outfitter_app_action_list', 'outfitter_entity_get', 'outfitter_entity_list', 'outfitter_entity_type_list']);
+function scopedToolCatalog(text, contentType) {
+  const filter = value => {
+    if (Array.isArray(value.result?.tools)) value.result.tools = value.result.tools.filter(
+      tool => readTools.has(tool.name) || tool.name === 'outfitter_app_action_call');
+    return value;
+  };
+  if (contentType.includes('text/event-stream')) return text.split('\n').map(line =>
+    line.startsWith('data:') ? `data: ${JSON.stringify(filter(JSON.parse(line.slice(5))))}` : line).join('\n');
+  return JSON.stringify(filter(JSON.parse(text)));
+}
 export async function readOnlyMcpRelay({ url, token, organizationId, installationIds, audit = [] }) {
   const transportToken = randomUUID();
   const server = createServer(async (request, response) => {
@@ -73,7 +83,9 @@ export async function readOnlyMcpRelay({ url, token, organizationId, installatio
         } catch { /* An undecodable identity response is not verification. */ }
       }
       if (upstream.headers.has('mcp-session-id')) headers['mcp-session-id'] = upstream.headers.get('mcp-session-id');
-      response.writeHead(upstream.status, headers).end(Buffer.concat(result));
+      const payload = Buffer.concat(result);
+      response.writeHead(upstream.status, headers).end(body.method === 'tools/list' && upstream.ok
+        ? scopedToolCatalog(payload.toString('utf8'), headers['content-type']) : payload);
     } catch {
       response.writeHead(502, { 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Evaluation MCP relay failed; credentials omitted' }));
     }

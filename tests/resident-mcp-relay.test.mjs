@@ -70,3 +70,30 @@ test('identity verification requires a successful native outfitter_identity_get 
     assert.ok(!JSON.stringify(audit).includes('private-token'));
   } finally { await relay.close(); await new Promise(resolve => upstream.close(resolve)); }
 });
+
+test('advertised JSON and SSE tool catalogs contain only callable read-policy tools', async () => {
+  let mode = 'json';
+  const upstream = createServer((request, response) => {
+    const rpc = { jsonrpc: '2.0', id: 1, result: { tools: [
+      { name: 'outfitter_identity_get' }, { name: 'outfitter_entity_get' },
+      { name: 'outfitter_app_action_call' }, { name: 'outfitter_entity_create' },
+      { name: 'planning_product_search' }, { name: 'governance_action' },
+    ] } };
+    response.writeHead(200, { 'content-type': mode === 'sse' ? 'text/event-stream' : 'application/json' })
+      .end(mode === 'sse' ? `event: message\ndata: ${JSON.stringify(rpc)}\n\n` : JSON.stringify(rpc));
+  });
+  await new Promise(resolve => upstream.listen(0, '127.0.0.1', resolve));
+  const relay = await readOnlyMcpRelay({ url: `http://127.0.0.1:${upstream.address().port}`,
+    token: 'private-token', organizationId: 'org', installationIds: ['wiki'] });
+  try {
+    for (mode of ['json', 'sse']) {
+      const response = await fetch(relay.url, { method: 'POST',
+        headers: { Authorization: `Bearer ${relay.transportToken}` },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) });
+      const raw = await response.text();
+      const rpc = JSON.parse(mode === 'sse' ? raw.split('\n').find(line => line.startsWith('data:')).slice(5) : raw);
+      assert.deepEqual(rpc.result.tools.map(tool => tool.name),
+        ['outfitter_identity_get', 'outfitter_entity_get', 'outfitter_app_action_call']);
+    }
+  } finally { await relay.close(); await new Promise(resolve => upstream.close(resolve)); }
+});

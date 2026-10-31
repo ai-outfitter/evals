@@ -57,7 +57,7 @@ if (mcpRelay) {
 const settings = JSON.parse(await readFile(join(agentDir, 'settings.json'), 'utf8'));
 // Do not start the registered resident's channel extensions in this isolated process.
 settings.packages = [];
-settings.defaultTools = ['a2a_read_task', 'a2a_complete_task', ...(input.mcp ? ['mcp__outfitter__outfitter_identity_get', 'mcp__outfitter__outfitter_app_action_list', 'mcp__outfitter__outfitter_app_action_call', 'mcp__outfitter__outfitter_organization_list', 'mcp', 'tool_search'] : [])];
+settings.defaultTools = ['a2a_read_task', 'a2a_complete_task', ...(input.mcp ? ['mcp__outfitter__outfitter_identity_get', 'mcp__outfitter__outfitter_app_action_list', 'mcp__outfitter__outfitter_app_action_call', 'mcp__outfitter__outfitter_organization_list'] : [])];
 await writeFile(join(agentDir, 'settings.json'), JSON.stringify(settings), { mode: 0o600 });
 const authored = await readFile(join(original, 'SYSTEM.md'), 'utf8');
 const models = await ModelRuntime.create({ modelsPath: join(agentDir, 'models.json'), authPath: join(agentDir, 'auth.json') });
@@ -87,7 +87,7 @@ if (input.mcp) {
 }
 await save('accepted-input.json', input);
 const probePath = join(directory, 'probe.mjs');
-await writeFile(probePath, `import {appendFileSync,readFileSync} from 'node:fs'; export default function(api){const graph=JSON.parse(readFileSync(${JSON.stringify(join(directory,'accepted-input.json'))},'utf8')).systemContext;api.on('before_provider_request',event=>{const p=event.payload; const system=Array.isArray(p.messages)?p.messages.filter(x=>x.role==='system'):p.system;const tools=p.tools??[];appendFileSync(${JSON.stringify(join(directory,'provider-observations.jsonl'))},JSON.stringify({at:Date.now(),system,nonSystemContainsGraph:JSON.stringify((p.messages??[]).filter(x=>x.role!=='system')).includes(JSON.stringify(graph).slice(1,-1)),tools:tools.map(t=>t.function?.name??t.name),parameters:{model:p.model,max_tokens:p.max_tokens,max_completion_tokens:p.max_completion_tokens,reasoning_effort:p.reasoning_effort,chat_template_kwargs:p.chat_template_kwargs}})+'\\n',{mode:0o600});});}`);
+await writeFile(probePath, `import {appendFileSync,readFileSync} from 'node:fs'; export default function(api){api.on('before_agent_start',()=>{api.setActiveTools(api.getActiveTools().filter(name=>name!=='tool_search'&&name!=='mcp'));});const graph=JSON.parse(readFileSync(${JSON.stringify(join(directory,'accepted-input.json'))},'utf8')).systemContext;api.on('before_provider_request',event=>{const p=event.payload; const system=Array.isArray(p.messages)?p.messages.filter(x=>x.role==='system'):p.system;const tools=p.tools??[];appendFileSync(${JSON.stringify(join(directory,'provider-observations.jsonl'))},JSON.stringify({at:Date.now(),system,nonSystemContainsGraph:JSON.stringify((p.messages??[]).filter(x=>x.role!=='system')).includes(JSON.stringify(graph).slice(1,-1)),tools:tools.map(t=>t.function?.name??t.name),parameters:{model:p.model,max_tokens:p.max_tokens,max_completion_tokens:p.max_completion_tokens,reasoning_effort:p.reasoning_effort,chat_template_kwargs:p.chat_template_kwargs}})+'\\n',{mode:0o600});});}`);
 let server, queue;
 const tools = [], token = randomUUID(), events = [];
 registerA2aTools({ registerTool: tool => tools.push(tool) }, () => server,
