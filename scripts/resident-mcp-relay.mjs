@@ -16,7 +16,17 @@ export async function restoreMcpAudit(path) {
 export const nativeMcpVerified = (audit, principal) => audit.some(item => item.verifiedPrincipal === principal);
 const readActions = new Set(['knowledge-graph.select', 'graph.relationships', 'work.context', 'resident.context',
   'projects.list', 'project.explore', 'governance.summary', 'governance.work-policy']);
-const readTools = new Set(['whoami', 'list_organizations', 'list_app_actions', 'get_entity', 'list_entities', 'list_entity_types']);
+const readTools = new Set(['outfitter_identity_get', 'outfitter_organization_list', 'outfitter_app_action_list', 'outfitter_entity_get', 'outfitter_entity_list', 'outfitter_entity_type_list']);
+function scopedToolCatalog(text, contentType) {
+  const filter = value => {
+    if (Array.isArray(value.result?.tools)) value.result.tools = value.result.tools.filter(
+      tool => readTools.has(tool.name) || tool.name === 'outfitter_app_action_call');
+    return value;
+  };
+  if (contentType.includes('text/event-stream')) return text.split('\n').map(line =>
+    line.startsWith('data:') ? `data: ${JSON.stringify(filter(JSON.parse(line.slice(5))))}` : line).join('\n');
+  return JSON.stringify(filter(JSON.parse(text)));
+}
 export async function readOnlyMcpRelay({ url, token, organizationId, installationIds, audit = [] }) {
   const transportToken = randomUUID();
   const server = createServer(async (request, response) => {
@@ -37,8 +47,8 @@ export async function readOnlyMcpRelay({ url, token, organizationId, installatio
       let allowed = ['initialize', 'notifications/initialized', 'ping', 'tools/list'].includes(body.method);
       const tool = body.params?.name, args = body.params?.arguments ?? {};
       if (body.method === 'tools/call') {
-        allowed = readTools.has(tool) || tool === 'call_app_action' && readActions.has(args.action);
-        if (!['whoami', 'list_organizations'].includes(tool)) {
+        allowed = readTools.has(tool) || tool === 'outfitter_app_action_call' && readActions.has(args.action);
+        if (!['outfitter_identity_get', 'outfitter_organization_list'].includes(tool)) {
           allowed &&= args.organizationId === organizationId;
           if (args.installationId) allowed &&= installationIds.includes(args.installationId);
         }
@@ -61,7 +71,7 @@ export async function readOnlyMcpRelay({ url, token, organizationId, installatio
       const headers = { 'content-type': upstream.headers.get('content-type') ?? 'application/json' };
       observation.httpStatus = upstream.status;
       observation.elapsedMs = Date.now() - observation.at;
-      if (upstream.ok && tool === 'whoami') {
+      if (upstream.ok && tool === 'outfitter_identity_get') {
         try {
           const text = Buffer.concat(result).toString('utf8');
           const message = text.split('\n').find(line => line.startsWith('data:'));
@@ -73,7 +83,9 @@ export async function readOnlyMcpRelay({ url, token, organizationId, installatio
         } catch { /* An undecodable identity response is not verification. */ }
       }
       if (upstream.headers.has('mcp-session-id')) headers['mcp-session-id'] = upstream.headers.get('mcp-session-id');
-      response.writeHead(upstream.status, headers).end(Buffer.concat(result));
+      const payload = Buffer.concat(result);
+      response.writeHead(upstream.status, headers).end(body.method === 'tools/list' && upstream.ok
+        ? scopedToolCatalog(payload.toString('utf8'), headers['content-type']) : payload);
     } catch {
       response.writeHead(502, { 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Evaluation MCP relay failed; credentials omitted' }));
     }

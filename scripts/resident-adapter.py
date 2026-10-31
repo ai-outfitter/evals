@@ -83,9 +83,9 @@ def connector(name, arguments, suffix):
     if not isinstance(argv, list) or not argv or not all(isinstance(x, str) for x in argv):
         raise ResidentError("Persistence authentication configuration missing: connectorCommand required")
     prepared = json.loads(Path(config["preparedSnapshot"]).read_text())
-    if name not in {"whoami", "get_entity", "call_app_action"}:
+    if name not in {"outfitter_identity_get", "outfitter_entity_get", "outfitter_app_action_call"}:
         raise ResidentError("Unsupported persistence operation")
-    if name != "whoami" and (arguments.get("organizationId"), arguments.get("installationId")) != (
+    if name != "outfitter_identity_get" and (arguments.get("organizationId"), arguments.get("installationId")) != (
             prepared["organizationId"], prepared["wikiInstallationId"]):
         raise ResidentError("Persistence crosses organization boundary")
     response = command(argv, {"name": name, "arguments": arguments}, timeout=180)
@@ -102,7 +102,7 @@ def execute():
         if request["company"] != prepared["organizationId"]:
             raise ResidentError("Snapshot does not belong to requested company")
         for actor, identity in prepared["actors"].items():
-            observed = mcp(actor, "whoami", {})
+            observed = mcp(actor, "outfitter_identity_get", {})
             proof = identity.get("canonicalIdentityProof", {})
             if observed.get("id") != proof.get("principalId") or proof.get("holderId") != identity["agentId"]:
                 raise ResidentError("Runtime principal does not match canonical Wiki identity evidence")
@@ -159,15 +159,15 @@ process.stdout.write(JSON.stringify(result));
         # Explicitly re-read current assignment before each save, including retries.
         args = {"organizationId": prepared["organizationId"], "installationId": prepared["wikiInstallationId"],
                 "type": "graph-node", "id": actor["assignmentId"]}
-        current = connector("get_entity", args, "assignment")
+        current = connector("outfitter_entity_get", args, "assignment")
         if current["data"]["revision"] != actor["assignmentRevision"] or current["data"]["attributes"].get("archived"):
             raise ResidentError("Role assignment changed; refresh sources and start a new experiment")
         for edge in actor["assignmentEdges"]:
-            link = connector("get_entity", {**args, "type": "graph-edge", "id": edge["id"]}, "edge-" + edge["id"])
+            link = connector("outfitter_entity_get", {**args, "type": "graph-edge", "id": edge["id"]}, "edge-" + edge["id"])
             if link["data"]["revision"] != edge["revision"] or link["data"]["attributes"].get("archived"):
                 raise ResidentError("Role assignment relationship changed; start a fresh experiment")
         # The authenticated operator owns this save; the resident authors it.
-        writer = connector("whoami", {}, "writer")
+        writer = connector("outfitter_identity_get", {}, "writer")
         previous = request.get("previous")
         node_id = previous["id"] if previous else str(uuid.uuid5(uuid.NAMESPACE_URL, request["requestKey"]))
         title = f"Eval {request['provenance']['run']} — {request['actor']} — {request['document'].get('kind', 'board charter')}"
@@ -180,11 +180,11 @@ process.stdout.write(JSON.stringify(result));
             op.update(id=node_id, revision=previous["revision"])
         else:
             attributes["id"] = node_id
-        receipt = connector("call_app_action", {"organizationId": prepared["organizationId"],
+        receipt = connector("outfitter_app_action_call", {"organizationId": prepared["organizationId"],
           "installationId": prepared["wikiInstallationId"], "action": "graph.apply",
           "input": {"requestKey": "eval-" + request["requestKey"], "operations": [op]}}, "save")
         write(directory / "save-receipt.json", receipt)
-        saved = connector("get_entity", {**args, "id": node_id}, "saved")
+        saved = connector("outfitter_entity_get", {**args, "id": node_id}, "saved")
         record = saved["data"]
         return {"id": node_id, "revision": record["revision"],
           "url": f"https://ai-outfitter.com/o/{prepared['organizationSlug']}/wiki-map/entities/{node_id}",

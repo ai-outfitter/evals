@@ -22,12 +22,12 @@ The private CLI config contains `company` (authenticated organization ID) and
 Capture an authenticated `knowledge-graph.select` result with explicit
 organization, resident, board, plan and relevant project roots. Retain the graph,
 selection definition, source revisions and omissions. Fetch the actual
-`BoardCharter` and `Plan` graph-type records through `get_entity`, including JSON
+`BoardCharter` and `Plan` graph-type records through `outfitter_entity_get`, including JSON
 schemas. Do not substitute local seeds for current production records.
 
 Resolve CPO/CTO assignments through exact `assigned_to`, `assigns_role` and
 `scoped_to` relationships. Require one active matching assignment. Verify each
-runtime's MCP `whoami` against the existing private canonical Wiki identity link,
+runtime's MCP `outfitter_identity_get` against the existing private canonical Wiki identity link,
 using its identity service or a read-only operator audit of those fields.
 Display names and public properties do not prove identity. Captured evidence
 does not grant authority or replace server authorization.
@@ -77,7 +77,8 @@ existing native MCP credentials. This is distinct from webapp scheduler or publi
 
 Each completion supplies one `evaluation` data artifact containing the requested
 JSON object. Response text is a completion note and is never parsed as data.
-The eval-local completion tool checks stage fields before settling a task;
+The eval-local completion tool checks stage fields and the stored document schema
+before settling a task, with the verified organization/owner and draft state fixed;
 schema, exact revision and current assignment checks still run in the coordinator
 and persistence adapter. Task scope distinguishes MCP platform organization IDs
 from Wiki organization-node IDs. Neither metadata nor context grants authority.

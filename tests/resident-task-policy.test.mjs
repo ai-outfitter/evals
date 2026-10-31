@@ -12,9 +12,9 @@ test('task routing scope distinguishes platform and graph organizations without 
   assert.ok(prompt.includes('"documentOrganizationId":"wiki-org-node"'));
   assert.ok(prompt.includes('"wikiInstallationId":"wiki-installation"'));
   assert.ok(prompt.includes('"authorAssignmentId":"author-assignment"'));
-  assert.ok(prompt.includes('whoami'));
+  assert.ok(prompt.includes('outfitter_identity_get'));
   assert.ok(!prompt.includes(input.systemContext));
-  assert.ok(!residentTaskInstructions({ ...input, mcp: false }).includes('whoami'));
+  assert.ok(!residentTaskInstructions({ ...input, mcp: false }).includes('outfitter_identity_get'));
 });
 
 test('ordinary document tasks expose completion without workflow writes or other task access', async () => {
@@ -38,8 +38,25 @@ test('ordinary document tasks expose completion without workflow writes or other
   assert.equal(transitions, 2);
   const request = selectResidentTaskTools(tools, 'request')[1];
   assert.deepEqual(request.parameters.properties.outputs.items.properties.value.properties.request.required, ['documentId', 'revision']);
-  const revision = selectResidentTaskTools(tools, 'revision')[1];
+  const schema = { type: 'object', required: ['cadence'], additionalProperties: false, properties: {
+    organization_id: { type: 'string' }, status: { type: 'string' },
+    owner_assignment_id: { type: 'string' }, cadence: { enum: ['annual'] },
+    approval: { type: ['object', 'null'] }, kind: { enum: ['roadmap', 'engineering'] },
+  } };
+  const scope = { documentSchema: schema, documentKind: 'roadmap', documentOrganizationId: 'wiki-org', identity: { assignmentId: 'role-assignment' } };
+  const revision = selectResidentTaskTools(tools, 'revision', scope)[1];
   assert.deepEqual(revision.parameters.properties.outputs.items.properties.value.required, ['document', 'feedbackDisposition']);
+  const body = revision.parameters.properties.outputs.items.properties.value.properties.document;
+  assert.deepEqual(body.required, ['cadence', 'organization_id', 'status', 'owner_assignment_id', 'kind']);
+  assert.equal(body.properties.organization_id.const, scope.documentOrganizationId);
+  assert.equal(body.properties.owner_assignment_id.const, scope.identity.assignmentId);
+  assert.equal(body.properties.status.const, 'draft');
+  assert.equal(body.properties.approval.const, null);
+  assert.equal(body.properties.kind.const, 'roadmap');
+  assert.deepEqual(body.properties.cadence, schema.properties.cadence);
+  assert.equal(body.additionalProperties, false);
+  assert.deepEqual(schema.required, ['cadence']);
+  assert.equal(schema.properties.status.const, undefined);
 });
 
 test('only a single named structured artifact supplies the result; response text is never parsed', () => {
